@@ -1,0 +1,135 @@
+Analyzing sigauth_proto2...                                     
+
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/models/signature_template.dart:4:14 • non_type_as_type_argument
+  error • The method 'toList' can't be unconditionally invoked because the receiver can be 'null' • lib/models/signature_template.dart:27:39 • unchecked_use_of_nullable_value
+  error • Undefined name 'FeatureVector' • lib/models/signature_template.dart:41:21 • undefined_identifier
+warning • The value of the field '_dtw' isn't used • lib/screens/diagnostics_screen.dart:23:19 • unused_field
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/diagnostics_screen.dart:223:18 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/diagnostics_screen.dart:225:37 • deprecated_member_use
+  error • The argument type 'num' can't be assigned to the parameter type 'double?'.  • lib/screens/diagnostics_screen.dart:332:24 • argument_type_not_assignable
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/screens/diagnostics_screen.dart:371:31 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/screens/diagnostics_screen.dart:371:54 • non_type_as_type_argument
+  error • Undefined name 'FeatureVector' • lib/screens/diagnostics_screen.dart:378:17 • undefined_identifier
+  error • A value of type 'num' can't be assigned to a variable of type 'int' • lib/screens/diagnostics_screen.dart:387:20 • invalid_assignment
+   info • Statements in a for should be enclosed in a block • lib/screens/diagnostics_screen.dart:406:35 • curly_braces_in_flow_control_structures
+   info • Use 'const' with the constructor to improve performance • lib/screens/diagnostics_screen.dart:413:14 • prefer_const_constructors
+  error • The method 'reverse' isn't defined for the type 'List' • lib/screens/diagnostics_screen.dart:414:10 • undefined_method
+   info • Use 'const' for final variables initialized to a constant value • lib/screens/diagnostics_screen.dart:449:5 • prefer_const_declarations
+   info • Statements in a for should be enclosed in a block • lib/screens/diagnostics_screen.dart:472:45 • curly_braces_in_flow_control_structures
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/screens/enrollment_screen.dart:23:19 • non_type_as_type_argument
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/enrollment_screen.dart:85:36 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/enrollment_screen.dart:120:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/enrollment_screen.dart:123:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/enrollment_screen.dart:159:41 • deprecated_member_use
+  error • The argument type 'num' can't be assigned to the parameter type 'double?'.  • lib/screens/enrollment_screen.dart:209:20 • argument_type_not_assignable
+  error • The name 'HapticService' is defined in the libraries 'package:sigauth_proto2/models/feature_vector.dart' and 'package:sigauth_proto2/services/haptic_service.dart' • lib/screens/enrollment_screen.dart:257:5 • ambiguous_import
+  error • The method 'lockout' isn't defined for the type 'HapticService' • lib/screens/lock_screen.dart:72:19 • undefined_method
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/lock_screen.dart:97:38 • deprecated_member_use
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/lock_screen.dart:166:42 • use_build_context_synchronously
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/lock_screen.dart:193:48 • deprecated_member_use
+  error • The method 'success' isn't defined for the type 'HapticService' • lib/screens/lock_screen.dart:219:21 • undefined_method
+  error • The method 'failure' isn't defined for the type 'HapticService' • lib/screens/lock_screen.dart:228:21 • undefined_method
+  error • The method 'warning' isn't defined for the type 'HapticService' • lib/screens/lock_screen.dart:244:65 • undefined_method
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/settings_screen.dart:150:45 • deprecated_member_use
+   info • 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre • lib/screens/settings_screen.dart:200:13 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/settings_screen.dart:201:47 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/settings_screen.dart:289:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/settings_screen.dart:291:53 • deprecated_member_use
+   info • Use 'const' with the constructor to improve performance • lib/screens/settings_screen.dart:337:22 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/screens/settings_screen.dart:338:26 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/screens/settings_screen.dart:341:22 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/screens/settings_screen.dart:342:26 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/screens/settings_screen.dart:365:22 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/screens/settings_screen.dart:366:26 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/screens/settings_screen.dart:369:22 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/screens/settings_screen.dart:370:26 • prefer_const_constructors
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/splash_screen.dart:79:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/splash_screen.dart:80:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/splash_screen.dart:84:46 • deprecated_member_use
+   info • Use 'const' with the constructor to improve performance • lib/screens/splash_screen.dart:96:22 • prefer_const_constructors
+   info • Use 'const' literals as arguments to constructors of '@immutable' classes • lib/screens/splash_screen.dart:97:27 • prefer_const_literals_to_create_immutables
+   info • Use 'const' with the constructor to improve performance • lib/screens/splash_screen.dart:106:19 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/screens/splash_screen.dart:107:30 • prefer_const_constructors
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/unlocked_screen.dart:23:47 • deprecated_member_use
+  error • Undefined name 'context' • lib/screens/unlocked_screen.dart:96:45 • undefined_identifier
+  error • Undefined name 'context' • lib/screens/unlocked_screen.dart:98:43 • undefined_identifier
+warning • Unused import: '../models/feature_vector.dart' • lib/services/adaptive_learner.dart:1:8 • unused_import
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/adaptive_learner.dart:10:10 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/adaptive_learner.dart:18:25 • non_type_as_type_argument
+  error • The method 'FeatureVector' isn't defined for the type 'AdaptiveLearner' • lib/services/adaptive_learner.dart:22:22 • undefined_method
+warning • Unused import: '../models/feature_vector.dart' • lib/services/auth_service.dart:2:8 • unused_import
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/auth_service.dart:20:8 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/auth_service.dart:25:32 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/auth_service.dart:25:55 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/auth_service.dart:30:17 • non_type_as_type_argument
+   info • Use 'const' for final variables initialized to a constant value • lib/services/auth_service.dart:35:5 • prefer_const_declarations
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/dtw_engine.dart:9:10 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/dtw_engine.dart:10:10 • non_type_as_type_argument
+  error • Undefined name 'FeatureVector' • lib/services/dtw_engine.dart:24:20 • undefined_identifier
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/dtw_engine.dart:45:17 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/dtw_engine.dart:63:8 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/dtw_engine.dart:64:17 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/dtw_engine.dart:67:23 • non_type_as_type_argument
+  error • The method 'FeatureVector' isn't defined for the type 'DTWEngine' • lib/services/dtw_engine.dart:86:20 • undefined_method
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/dtw_engine.dart:95:41 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/feature_extraction_service.dart:6:8 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/feature_extraction_service.dart:11:27 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a class • lib/services/feature_extraction_service.dart:13:15 • creation_with_non_type
+  error • The method 'FeatureVector' isn't defined for the type 'FeatureExtractionService' • lib/services/feature_extraction_service.dart:18:21 • undefined_method
+  error • The method 'FeatureVector' isn't defined for the type 'FeatureExtractionService' • lib/services/feature_extraction_service.dart:29:21 • undefined_method
+  error • The method 'FeatureVector' isn't defined for the type 'FeatureExtractionService' • lib/services/feature_extraction_service.dart:43:21 • undefined_method
+  error • The method 'FeatureVector' isn't defined for the type 'FeatureExtractionService' • lib/services/feature_extraction_service.dart:59:21 • undefined_method
+   info • Use 'const' with the constructor to improve performance • lib/services/feature_extraction_service.dart:79:41 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/services/feature_extraction_service.dart:82:21 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/services/feature_extraction_service.dart:119:41 • prefer_const_constructors
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/feature_extraction_service.dart:167:8 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/feature_extraction_service.dart:167:47 • non_type_as_type_argument
+  error • The method 'FeatureVector' isn't defined for the type 'FeatureExtractionService' • lib/services/feature_extraction_service.dart:190:14 • undefined_method
+  error • The property 'x' can't be unconditionally accessed because the receiver can be 'null' • lib/services/feature_extraction_service.dart:191:14 • unchecked_use_of_nullable_value
+  error • The property 'y' can't be unconditionally accessed because the receiver can be 'null' • lib/services/feature_extraction_service.dart:192:14 • unchecked_use_of_nullable_value
+  error • The property 'vx' can't be unconditionally accessed because the receiver can be 'null' • lib/services/feature_extraction_service.dart:193:19 • unchecked_use_of_nullable_value
+  error • The property 'vy' can't be unconditionally accessed because the receiver can be 'null' • lib/services/feature_extraction_service.dart:194:19 • unchecked_use_of_nullable_value
+  error • The property 'speed' can't be unconditionally accessed because the receiver can be 'null' • lib/services/feature_extraction_service.dart:195:22 • unchecked_use_of_nullable_value
+  error • The property 'ax' can't be unconditionally accessed because the receiver can be 'null' • lib/services/feature_extraction_service.dart:196:19 • unchecked_use_of_nullable_value
+  error • The property 'ay' can't be unconditionally accessed because the receiver can be 'null' • lib/services/feature_extraction_service.dart:197:19 • unchecked_use_of_nullable_value
+  error • The property 'pressure' can't be unconditionally accessed because the receiver can be 'null' • lib/services/feature_extraction_service.dart:198:21 • unchecked_use_of_nullable_value
+  error • The property 'curvature' can't be unconditionally accessed because the receiver can be 'null' • lib/services/feature_extraction_service.dart:199:26 • unchecked_use_of_nullable_value
+  error • The property 'isStrokeBoundary' can't be unconditionally accessed because the receiver can be 'null' • lib/services/feature_extraction_service.dart:200:29 • unchecked_use_of_nullable_value
+warning • Unused import: '../models/feature_vector.dart' • lib/services/liveness_detector.dart:3:8 • unused_import
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/liveness_detector.dart:13:10 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/liveness_detector.dart:65:48 • non_type_as_type_argument
+  error • The property 'speed' can't be unconditionally accessed because the receiver can be 'null' • lib/services/liveness_detector.dart:67:31 • unchecked_use_of_nullable_value
+  error • The operator '>' can't be unconditionally invoked because the receiver can be 'null' • lib/services/liveness_detector.dart:67:53 • unchecked_use_of_nullable_value
+  error • The operator '+' can't be unconditionally invoked because the receiver can be 'null' • lib/services/liveness_detector.dart:69:44 • unchecked_use_of_nullable_value
+  error • The operator '-' can't be unconditionally invoked because the receiver can be 'null' • lib/services/liveness_detector.dart:72:24 • unchecked_use_of_nullable_value
+  error • The operator '-' can't be unconditionally invoked because the receiver can be 'null' • lib/services/liveness_detector.dart:72:37 • unchecked_use_of_nullable_value
+  error • The operator '+' can't be unconditionally invoked because the receiver can be 'null' • lib/services/liveness_detector.dart:73:29 • unchecked_use_of_nullable_value
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/liveness_detector.dart:81:47 • non_type_as_type_argument
+  error • The name 'FeatureVector' isn't a type, so it can't be used as a type argument • lib/services/liveness_detector.dart:98:52 • non_type_as_type_argument
+  error • The property 'ax' can't be unconditionally accessed because the receiver can be 'null' • lib/services/liveness_detector.dart:100:28 • unchecked_use_of_nullable_value
+  error • The property 'ax' can't be unconditionally accessed because the receiver can be 'null' • lib/services/liveness_detector.dart:100:35 • unchecked_use_of_nullable_value
+  error • The property 'ay' can't be unconditionally accessed because the receiver can be 'null' • lib/services/liveness_detector.dart:100:42 • unchecked_use_of_nullable_value
+  error • The property 'ay' can't be unconditionally accessed because the receiver can be 'null' • lib/services/liveness_detector.dart:100:49 • unchecked_use_of_nullable_value
+warning • The '!' will have no effect because the receiver can't be null • lib/services/signal_processing_service.dart:54:14 • unnecessary_non_null_assertion
+   info • Instances of 'Color' should be created using an 8-digit hexadecimal integer (such as '0xFFFFFFFF') • lib/theme/app_theme.dart:10:40 • use_full_hex_values_for_flutter_colors
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/auth_feedback_overlay.dart:65:40 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/auth_feedback_overlay.dart:76:38 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/auth_feedback_overlay.dart:79:42 • deprecated_member_use
+   info • Parameter 'listenable' could be a super parameter • lib/widgets/auth_feedback_overlay.dart:134:9 • use_super_parameters
+   info • Use 'const' literals as arguments to constructors of '@immutable' classes • lib/widgets/signature_canvas.dart:54:20 • prefer_const_literals_to_create_immutables
+   info • Use 'const' with the constructor to improve performance • lib/widgets/signature_canvas.dart:55:11 • prefer_const_constructors
+  error • The method 'tap' isn't defined for the type 'HapticService' • lib/widgets/signature_canvas.dart:104:45 • undefined_method
+  error • The method 'lift' isn't defined for the type 'HapticService' • lib/widgets/signature_canvas.dart:149:45 • undefined_method
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/signature_canvas.dart:202:37 • deprecated_member_use
+  error • 5 positional arguments expected by '_seg', but 4 found • lib/widgets/signature_canvas.dart:202:66 • not_enough_positional_arguments
+  error • The named parameter 'blur' isn't defined • lib/widgets/signature_canvas.dart:202:68 • undefined_named_parameter
+  error • 5 positional arguments expected by '_seg', but 4 found • lib/widgets/signature_canvas.dart:205:45 • not_enough_positional_arguments
+  error • The named parameter 'blur' isn't defined • lib/widgets/signature_canvas.dart:205:47 • undefined_named_parameter
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/signature_canvas.dart:208:37 • deprecated_member_use
+  error • 5 positional arguments expected by '_seg', but 4 found • lib/widgets/signature_canvas.dart:208:68 • not_enough_positional_arguments
+  error • The named parameter 'blur' isn't defined • lib/widgets/signature_canvas.dart:208:70 • undefined_named_parameter
+   info • Use 'const' for final variables initialized to a constant value • lib/widgets/signature_canvas.dart:242:5 • prefer_const_declarations
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/signature_canvas.dart:243:53 • deprecated_member_use
+  error • The name 'MyApp' isn't a class • test/widget_test.dart:16:35 • creation_with_non_type
+
+131 issues found. (ran in 5.1s)
