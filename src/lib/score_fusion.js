@@ -7,9 +7,10 @@ export const DTW_SCALE_MULTIPLIER = 3.0;
 export const DTW_MIN_THRESHOLD = 0.08;
 
 // Model Fusion Weights
-export const BASE_DTW_WEIGHT = 0.80;
+export const BASE_DTW_WEIGHT = 0.45;
+export const BASE_SIAMESE_WEIGHT = 0.40;
+export const BASE_BEHAVIOR_WEIGHT = 0.15;
 export const BASE_IMAGE_WEIGHT = 0.10;
-export const BASE_BEHAVIOR_WEIGHT = 0.10;
 
 // Dynamic Threshold Settings
 export const COLD_START_THRESHOLD = 62;
@@ -91,27 +92,29 @@ export function scoreFromDistanceBand(bestDistance, referenceThreshold) {
 }
 
 /**
- * Fuse DTW, image, and behavioral scores.
+ * Fuse DTW, Siamese, behavioral, and image scores.
  */
-export function fuseScores(dtwSim, imageSim, behaviorSim) {
+export function fuseScores(dtwSim, siameseSim, behaviorSim, imageSim = null) {
     const dtwScore = Math.max(0, Math.min(100, dtwSim)) / 100;
-    const imageScore = confidenceAdjustedScore(imageSim);
+    const siameseScore = confidenceAdjustedScore(siameseSim);
     const behavioralScore = confidenceAdjustedScore(behaviorSim);
+    const imageScore = confidenceAdjustedScore(imageSim);
 
-    // DTW is the most robust signal.
-    let dtwWeight = BASE_DTW_WEIGHT;
-    const imageWeight = imageScore !== null ? BASE_IMAGE_WEIGHT : 0;
-    const behaviorWeight = behavioralScore !== null ? BASE_BEHAVIOR_WEIGHT : 0;
-    
-    // absorb unused weight
-    dtwWeight += ((BASE_IMAGE_WEIGHT + BASE_BEHAVIOR_WEIGHT) - imageWeight - behaviorWeight);
+    const activeEntries = [
+        { score: dtwScore, weight: BASE_DTW_WEIGHT }
+    ];
 
-    const fused = weightedAverage([
-        { score: dtwScore,       weight: dtwWeight },
-        { score: imageScore,     weight: imageWeight },
-        { score: behavioralScore, weight: behaviorWeight },
-    ]);
+    if (siameseScore !== null) {
+        activeEntries.push({ score: siameseScore, weight: BASE_SIAMESE_WEIGHT });
+    }
+    if (behavioralScore !== null) {
+        activeEntries.push({ score: behavioralScore, weight: BASE_BEHAVIOR_WEIGHT });
+    }
+    if (imageScore !== null) {
+        activeEntries.push({ score: imageScore, weight: BASE_IMAGE_WEIGHT });
+    }
 
+    const fused = weightedAverage(activeEntries);
     return Math.max(0, Math.min(100, fused * 100));
 }
 
@@ -154,8 +157,26 @@ export function ptDist(a, b) {
 
 /**
  * Dynamic threshold — adapts as the user builds a score history.
+ * Customizes min/max caps and offsets based on pointer precision (touch vs mouse).
  */
-export function getDynamicThreshold(avgScore) {
+export function getDynamicThreshold(avgScore, calibration = null) {
+    let offset = THRESHOLD_OFFSET;
+    let minThreshold = MIN_DYNAMIC_THRESHOLD;
+    let maxThreshold = MAX_DYNAMIC_THRESHOLD;
+
+    if (calibration && calibration.profile) {
+        const { pointerType } = calibration.profile;
+        if (pointerType === 'fine') {
+            offset = 6;
+            minThreshold = 65;
+            maxThreshold = 85;
+        } else if (pointerType === 'coarse') {
+            offset = 10;
+            minThreshold = 55;
+            maxThreshold = 75;
+        }
+    }
+
     if (avgScore === null || avgScore === undefined) return COLD_START_THRESHOLD;
-    return Math.max(MIN_DYNAMIC_THRESHOLD, Math.min(MAX_DYNAMIC_THRESHOLD, avgScore - THRESHOLD_OFFSET));
+    return Math.max(minThreshold, Math.min(maxThreshold, avgScore - offset));
 }

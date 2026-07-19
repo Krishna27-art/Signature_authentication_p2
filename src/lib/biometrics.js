@@ -2,10 +2,10 @@
    biometrics.js — Deployment-Ready Signature Biometric Engine
 
    Deployment fixes over previous version:
-   1. Encryption key no longer uses userAgent/screen — uses only
-      the random salt stored in localStorage. This means the key
-      is the same across all browsers/devices on the same origin,
-      so enrolled data is readable after deployment.
+    1. Encryption key is derived from a hardcoded appSecret and a random salt in localStorage.
+       This acts as best-effort local data obfuscation to prevent casual inspection or
+       accidental leakage, but is NOT a cryptographically secure barrier against targeted
+       client-side extraction since the appSecret is embedded in the JS bundle.
    2. normalize() clamps dt to 8–100ms range to handle different
       touch sampling rates (60Hz mobile vs 120Hz+ desktop).
    3. Bounding box minimum raised from 20px to 10 (unit space)
@@ -334,41 +334,8 @@ export async function enrollSample(pts, state, partials, canvas, strokes) {
     }
     const standardizedFeatures = behaviorFeatures.map(f => standardize(f, { mean, std }));
     
-    // 3. Train Siamese Network with Triplet Loss (BiLSTM Sequence Encoder)
-    let siameseTrained = false;
-    try {
-        const sequences = partials.map(extractSequenceFeatures);
-        const numPairs = sequences.length;
-        const anchors = [];
-        const positives = [];
-        const negatives = [];
-        
-        // Generate triplets
-        for (let i = 0; i < numPairs; i++) {
-            const anchor = sequences[i];
-            const positive = sequences[(i + 1) % numPairs]; // Another genuine sample
-            
-            // Generate a synthetic negative sample (randomly altered)
-            const negative = anchor.map(pt => [
-                pt[0] + (Math.random() - 0.5) * 0.1, // x
-                pt[1] + (Math.random() - 0.5) * 0.1, // y
-                pt[2] * (0.8 + Math.random() * 0.4), // vel
-                pt[3] + (Math.random() - 0.5) * 0.2, // dir
-                pt[4] * (0.8 + Math.random() * 0.4), // acc
-                pt[5] * (0.8 + Math.random() * 0.4), // curv
-                pt[6] * (0.8 + Math.random() * 0.4)  // pressure
-            ]);
-            
-            anchors.push(anchor);
-            positives.push(positive);
-            negatives.push(negative);
-        }
-        
-        await trainSiameseModel(anchors, positives, negatives, 30);
-        siameseTrained = true;
-    } catch (err) {
-        console.warn("Siamese network training failed:", err.message);
-    }
+    // 3. Siamese Network (Uses globally pretrained model)
+    const siameseTrained = true;
 
     // 4. DTW threshold from pairwise enrollment distances
     const pairDistances = [];
@@ -549,11 +516,9 @@ export async function verifySample(pts, state, canvas, strokes) {
     }
 
     // ── Fuse & decide ─────────────────────────────────────────────────────────
-    const behaviorScore = siameseScore !== null ? siameseScore : (cancelableScore !== null ? cancelableScore : null);
-    
-    const rawFused = fuseScores(dtwSimilarity, imageScore, behaviorScore);
+    const rawFused = fuseScores(dtwSimilarity, siameseScore, cancelableScore, imageScore);
     const final    = Math.max(0, rawFused - strokePenalty);
-    const threshold = getDynamicThreshold(state.avgScore);
+    const threshold = getDynamicThreshold(state.avgScore, calibration);
 
     // ── Session anomaly detection
     // Flag sharp deviations from the user's baseline that may indicate session hijack

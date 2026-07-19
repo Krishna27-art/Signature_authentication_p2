@@ -145,4 +145,7 @@ When a new signature is submitted, the system performs:
 
 ## Security Notes
 
-This project is a **student research prototype** for demonstrating biometric authentication concepts. It is **not production-ready** and should not be used for security-critical applications.
+This project is a **student research prototype** for demonstrating biometric authentication concepts.
+- **Encryption Boundary**: Biometric templates are encrypted in IndexedDB using AES-GCM. This prevents casual devtools inspection or raw local data leakage (best-effort obfuscation), but does not defend against an attacker who can inspect the client-side JavaScript source or extract keys from memory.
+- **Biometric Performance**: Real-world biometric performance should always report False Acceptance Rate (FAR) and False Rejection Rate (FRR) together, rather than a single average accuracy percentage. For touchscreen input, a realistic target is 90–94% real-world accuracy (6–10% EER).
+

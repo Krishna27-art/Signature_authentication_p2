@@ -31,17 +31,29 @@ tf.serialization.registerClass(L2NormLayer);
 export async function loadSiameseModel() {
     if (cachedSiameseModel) return cachedSiameseModel;
     try {
-        cachedSiameseModel = await tf.loadLayersModel(SIAMESE_MODEL_URL);
-        console.log('✅ Siamese BiLSTM model loaded from IndexedDB.');
+        if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+            const path = await import('path');
+            const fs = await import('fs');
+            const modelPath = path.resolve('./public/models/siamese/model.json');
+            if (fs.existsSync(modelPath)) {
+                const modelJson = JSON.parse(fs.readFileSync(modelPath, 'utf8'));
+                const binData = fs.readFileSync(path.resolve('./public/models/siamese/group1-shard1of1.bin'));
+                cachedSiameseModel = await tf.loadLayersModel(tf.io.fromMemory(
+                    modelJson.modelTopology,
+                    modelJson.weightsManifest[0].weights,
+                    binData.buffer.slice(binData.byteOffset, binData.byteOffset + binData.byteLength)
+                ));
+                console.log('✅ Siamese BiLSTM model loaded in Node.');
+                return cachedSiameseModel;
+            }
+        }
+        cachedSiameseModel = await tf.loadLayersModel('/models/siamese/model.json');
+        console.log('✅ Siamese BiLSTM model loaded from static public asset.');
         return cachedSiameseModel;
-    } catch {
+    } catch (e) {
+        console.warn('⚠️ Failed to load Siamese model:', e.message);
         return null;
     }
-}
-
-export async function saveSiameseModel(model) {
-    cachedSiameseModel = model;
-    await model.save(SIAMESE_MODEL_URL);
 }
 
 // ── Architecture ──────────────────────────────────────────────────────────────
