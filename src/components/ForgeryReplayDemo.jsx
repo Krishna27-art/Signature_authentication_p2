@@ -9,108 +9,83 @@
  * - Feature comparison
  */
 
-import React, { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 
 /**
  * Signature Comparison View
  */
 function SignatureComparison({ genuine, forged, dtwPath, width = 400, height = 300 }) {
     const canvasRef = useRef(null);
-    
-    const drawSignature = (points, color, lineWidth = 2) => {
-        if (!points || points.length === 0) return;
-        
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        
-        // Calculate bounds
-        const xs = points.map(p => p.x);
-        const ys = points.map(p => p.y);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
-        
-        const padding = 20;
-        const scaleX = (width - 2 * padding) / (maxX - minX || 1);
-        const scaleY = (height - 2 * padding) / (maxY - minY || 1);
-        
-        ctx.beginPath();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = lineWidth;
-        
-        points.forEach((point, i) => {
-            const x = padding + (point.x - minX) * scaleX;
-            const y = padding + (point.y - minY) * scaleY;
-            
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        
-        ctx.stroke();
-    };
-    
-    const drawDTWPath = (genuinePoints, forgedPoints, path) => {
-        if (!path || path.length === 0) return;
-        
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        
-        // Calculate bounds for both signatures
-        const allPoints = [...genuinePoints, ...forgedPoints];
-        const xs = allPoints.map(p => p.x);
-        const ys = allPoints.map(p => p.y);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
-        
-        const padding = 20;
-        const scaleX = (width - 2 * padding) / (maxX - minX || 1);
-        const scaleY = (height - 2 * padding) / (maxY - minY || 1);
-        
-        // Draw DTW alignment lines
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.3)';
-        ctx.lineWidth = 1;
-        
-        path.forEach(([i, j]) => {
-            const p1 = genuinePoints[i];
-            const p2 = forgedPoints[j];
-            
-            const x1 = padding + (p1.x - minX) * scaleX;
-            const y1 = padding + (p1.y - minY) * scaleY;
-            const x2 = padding + (p2.x - minX) * scaleX;
-            const y2 = padding + (p2.y - minY) * scaleY;
-            
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
-            ctx.stroke();
-        });
-    };
-    
-    React.useEffect(() => {
+
+    useEffect(() => {
         if (!canvasRef.current) return;
         
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         
         ctx.clearRect(0, 0, width, height);
-        
-        // Draw genuine signature (green)
-        if (genuine) {
-            drawSignature(genuine, '#22c55e', 3);
-        }
-        
-        // Draw forged signature (red)
-        if (forged) {
-            drawSignature(forged, '#ef4444', 2);
-        }
-        
-        // Draw DTW path
-        if (genuine && forged && dtwPath) {
-            drawDTWPath(genuine, forged, dtwPath);
-        }
+
+        const drawSignature = (points, color, lineWidth = 2) => {
+            if (!points || points.length === 0) return;
+            const xs = points.map(p => p.x);
+            const ys = points.map(p => p.y);
+            const minX = Math.min(...xs);
+            const maxX = Math.max(...xs);
+            const minY = Math.min(...ys);
+            const maxY = Math.max(...ys);
+            
+            const padding = 20;
+            const scaleX = (width - 2 * padding) / (maxX - minX || 1);
+            const scaleY = (height - 2 * padding) / (maxY - minY || 1);
+            
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth;
+            
+            points.forEach((point, i) => {
+                const x = padding + (point.x - minX) * scaleX;
+                const y = padding + (point.y - minY) * scaleY;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+        };
+
+        const drawDTWPath = (genuinePoints, forgedPoints, path) => {
+            if (!path || path.length === 0) return;
+            const allPoints = [...genuinePoints, ...forgedPoints];
+            const xs = allPoints.map(p => p.x);
+            const ys = allPoints.map(p => p.y);
+            const minX = Math.min(...xs);
+            const maxX = Math.max(...xs);
+            const minY = Math.min(...ys);
+            const maxY = Math.max(...ys);
+            
+            const padding = 20;
+            const scaleX = (width - 2 * padding) / (maxX - minX || 1);
+            const scaleY = (height - 2 * padding) / (maxY - minY || 1);
+            
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.3)';
+            ctx.lineWidth = 1;
+            
+            path.forEach(([i, j]) => {
+                const p1 = genuinePoints[i];
+                const p2 = forgedPoints[j];
+                const x1 = padding + (p1.x - minX) * scaleX;
+                const y1 = padding + (p1.y - minY) * scaleY;
+                const x2 = padding + (p2.x - minX) * scaleX;
+                const y2 = padding + (p2.y - minY) * scaleY;
+                
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            });
+        };
+
+        if (genuine) drawSignature(genuine, '#22c55e', 3);
+        if (forged) drawSignature(forged, '#ef4444', 2);
+        if (genuine && forged && dtwPath) drawDTWPath(genuine, forged, dtwPath);
         
     }, [genuine, forged, dtwPath, width, height]);
     
@@ -138,23 +113,28 @@ function SignatureComparison({ genuine, forged, dtwPath, width = 400, height = 3
 function ConfidenceComparison({ genuineScore, forgedScore }) {
     return (
         <div style={{ 
-            padding: '20px', 
-            backgroundColor: 'white', 
-            borderRadius: '8px',
-            border: '1px solid #e5e7eb'
+            display: 'grid', 
+            gridTemplateColumns: '1fr 1fr 1fr', 
+            gap: '15px',
+            margin: '20px 0',
+            alignItems: 'center'
         }}>
-            <h3 style={{ marginBottom: '15px', color: '#1f2937' }}>Confidence Comparison</h3>
-            
-            <div style={{ marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                    <span style={{ color: '#22c55e', fontWeight: 'bold' }}>Genuine Signature</span>
-                    <span style={{ fontWeight: 'bold' }}>{(genuineScore * 100).toFixed(1)}%</span>
+            <div style={{ 
+                padding: '15px', 
+                backgroundColor: '#f0fdf4', 
+                borderRadius: '8px',
+                border: '1px solid #bbf7d0'
+            }}>
+                <div style={{ fontSize: '12px', color: '#166534' }}>Genuine Confidence</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#15803d' }}>
+                    {(genuineScore * 100).toFixed(1)}%
                 </div>
                 <div style={{ 
-                    height: '20px', 
+                    height: '8px', 
                     backgroundColor: '#e5e7eb', 
-                    borderRadius: '10px',
-                    overflow: 'hidden'
+                    borderRadius: '4px',
+                    overflow: 'hidden',
+                    marginTop: '8px'
                 }}>
                     <div style={{ 
                         height: '100%', 
@@ -165,16 +145,22 @@ function ConfidenceComparison({ genuineScore, forgedScore }) {
                 </div>
             </div>
             
-            <div style={{ marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                    <span style={{ color: '#ef4444', fontWeight: 'bold' }}>Forged Signature</span>
-                    <span style={{ fontWeight: 'bold' }}>{(forgedScore * 100).toFixed(1)}%</span>
+            <div style={{ 
+                padding: '15px', 
+                backgroundColor: '#fef2f2', 
+                borderRadius: '8px',
+                border: '1px solid #fecaca'
+            }}>
+                <div style={{ fontSize: '12px', color: '#991b1b' }}>Forged Confidence</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#b91c1c' }}>
+                    {(forgedScore * 100).toFixed(1)}%
                 </div>
                 <div style={{ 
-                    height: '20px', 
+                    height: '8px', 
                     backgroundColor: '#e5e7eb', 
-                    borderRadius: '10px',
-                    overflow: 'hidden'
+                    borderRadius: '4px',
+                    overflow: 'hidden',
+                    marginTop: '8px'
                 }}>
                     <div style={{ 
                         height: '100%', 
@@ -193,7 +179,7 @@ function ConfidenceComparison({ genuineScore, forgedScore }) {
             }}>
                 <div style={{ fontSize: '12px', color: '#6b7280' }}>Confidence Gap</div>
                 <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#1f2937' }}>
-                    {Math.abs(genuineScore - forgedScore * 100).toFixed(1)}%
+                    {(Math.abs(genuineScore - forgedScore) * 100).toFixed(1)}%
                 </div>
             </div>
         </div>
@@ -206,116 +192,79 @@ function ConfidenceComparison({ genuineScore, forgedScore }) {
 function FeatureDifference({ genuineFeatures, forgedFeatures }) {
     const canvasRef = useRef(null);
     
-    React.useEffect(() => {
+    useEffect(() => {
         if (!canvasRef.current || !genuineFeatures || !forgedFeatures) return;
         
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
         
-        ctx.clearRect(0, 0, 300, 200);
+        ctx.clearRect(0, 0, width, height);
         
-        const featureNames = ['Velocity', 'Acceleration', 'Pressure', 'Curvature', 'Direction', 'Rhythm'];
-        const numFeatures = featureNames.length;
-        
+        const featureNames = ['Speed', 'Pressure', 'Curvature', 'Rhythm', 'Entropy', 'Cadence'];
         const barWidth = 30;
-        const spacing = 15;
-        const startX = 40;
-        const maxHeight = 150;
+        const gap = 20;
+        const startX = 60;
         
         // Draw axes
-        ctx.strokeStyle = '#9ca3af';
-        ctx.lineWidth = 1;
         ctx.beginPath();
+        ctx.strokeStyle = '#e5e7eb';
         ctx.moveTo(startX, 20);
-        ctx.lineTo(startX, 180);
-        ctx.lineTo(280, 180);
+        ctx.lineTo(startX, height - 40);
+        ctx.lineTo(width - 20, height - 40);
         ctx.stroke();
         
-        // Draw bars
-        genuineFeatures.forEach((value, i) => {
-            const x = startX + i * (barWidth + spacing);
-            const height = value * maxHeight;
+        // Draw grid lines
+        for (let i = 0; i <= 5; i++) {
+            const y = height - 40 - (i / 5) * (height - 60);
+            ctx.beginPath();
+            ctx.strokeStyle = '#f3f4f6';
+            ctx.moveTo(startX, y);
+            ctx.lineTo(width - 20, y);
+            ctx.stroke();
             
-            // Genuine bar (green)
-            ctx.fillStyle = 'rgba(34, 197, 94, 0.7)';
-            ctx.fillRect(x, 180 - height, barWidth / 2 - 2, height);
-            
-            // Forged bar (red)
-            const forgedValue = forgedFeatures[i] || 0;
-            const forgedHeight = forgedValue * maxHeight;
-            ctx.fillStyle = 'rgba(239, 68, 68, 0.7)';
-            ctx.fillRect(x + barWidth / 2, 180 - forgedHeight, barWidth / 2 - 2, forgedHeight);
-            
-            // Label
-            ctx.fillStyle = '#374151';
+            ctx.fillStyle = '#9ca3af';
             ctx.font = '10px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${(i * 20)}%`, startX - 10, y + 3);
+        }
+        
+        // Draw bars
+        featureNames.forEach((name, i) => {
+            const x = startX + i * (barWidth * 2 + gap) + 10;
+            
+            const gVal = genuineFeatures[i] || 0;
+            const gHeight = gVal * (height - 60);
+            const gY = height - 40 - gHeight;
+            
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(x, gY, barWidth, gHeight);
+            
+            const fVal = forgedFeatures[i] || 0;
+            const fHeight = fVal * (height - 60);
+            const fY = height - 40 - fHeight;
+            
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(x + barWidth, fY, barWidth, fHeight);
+            
+            ctx.fillStyle = '#4b5563';
+            ctx.font = '11px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(featureNames[i].substring(0, 3), x + barWidth / 2, 195);
+            ctx.fillText(name, x + barWidth, height - 20);
         });
-        
-        // Legend
-        ctx.fillStyle = '#22c55e';
-        ctx.fillRect(200, 10, 10, 10);
-        ctx.fillStyle = '#374151';
-        ctx.textAlign = 'left';
-        ctx.fillText('Genuine', 215, 18);
-        
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(200, 25, 10, 10);
-        ctx.fillStyle = '#374151';
-        ctx.fillText('Forged', 215, 33);
         
     }, [genuineFeatures, forgedFeatures]);
     
     return (
-        <div className="feature-difference">
-            <h3>Feature Difference</h3>
+        <div>
+            <h4>Biometric Feature Comparison</h4>
             <canvas 
                 ref={canvasRef} 
-                width={300} 
-                height={200}
+                width={500} 
+                height={250}
                 style={{ border: '1px solid #e5e7eb', borderRadius: '8px' }}
             />
-        </div>
-    );
-}
-
-/**
- * Forgery Type Selector
- */
-function ForgeryTypeSelector({ selectedType, onSelect }) {
-    const types = [
-        { id: 'traced', name: 'Traced', description: 'Slow, careful tracing of genuine signature' },
-        { id: 'fast', name: 'Fast Hasty', description: 'Quick, rushed attempt' },
-        { id: 'distorted', name: 'Distorted', description: 'Intentionally deformed signature' },
-        { id: 'random', name: 'Random', description: 'Random scribble' }
-    ];
-    
-    return (
-        <div style={{ marginBottom: '20px' }}>
-            <h3 style={{ marginBottom: '10px', color: '#1f2937' }}>Forgery Type</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                {types.map(type => (
-                    <button
-                        key={type.id}
-                        onClick={() => onSelect(type.id)}
-                        style={{
-                            padding: '15px',
-                            border: '2px solid',
-                            borderColor: selectedType === type.id ? '#3b82f6' : '#e5e7eb',
-                            backgroundColor: selectedType === type.id ? '#eff6ff' : 'white',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            textAlign: 'left'
-                        }}
-                    >
-                        <div style={{ fontWeight: 'bold', color: '#1f2937' }}>{type.name}</div>
-                        <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '5px' }}>
-                            {type.description}
-                        </div>
-                    </button>
-                ))}
-            </div>
         </div>
     );
 }
@@ -325,17 +274,17 @@ function ForgeryTypeSelector({ selectedType, onSelect }) {
  */
 export default function ForgeryReplayDemo() {
     const [selectedForgery, setSelectedForgery] = useState('traced');
-    const [genuineScore, setGenuineScore] = useState(0.85);
+    const [genuineScore] = useState(0.85);
     const [forgedScore, setForgedScore] = useState(0.45);
     
     // Simulated data for demo
-    const genuineSignature = [
+    const genuineSignature = useMemo(() => [
         { x: 50, y: 100 }, { x: 70, y: 90 }, { x: 90, y: 85 }, { x: 110, y: 90 },
         { x: 130, y: 100 }, { x: 150, y: 115 }, { x: 170, y: 130 }, { x: 190, y: 145 },
         { x: 210, y: 155 }, { x: 230, y: 160 }, { x: 250, y: 155 }, { x: 270, y: 145 }
-    ];
+    ], []);
     
-    const forgedSignatures = {
+    const forgedSignatures = useMemo(() => ({
         traced: genuineSignature.map(p => ({ ...p, x: p.x + 5, y: p.y + 3 })),
         fast: genuineSignature.map(p => ({ ...p, x: p.x + 10, y: p.y + 8 })),
         distorted: genuineSignature.map((p, i) => ({ 
@@ -343,97 +292,76 @@ export default function ForgeryReplayDemo() {
             x: p.x + Math.sin(i * 0.5) * 10,
             y: p.y + Math.cos(i * 0.5) * 10
         })),
-        random: Array.from({ length: 12 }, (_, i) => ({
-            x: 50 + Math.random() * 200,
-            y: 80 + Math.random() * 80
-        }))
-    };
+        random: [
+            { x: 50, y: 85 }, { x: 80, y: 110 }, { x: 110, y: 95 }, { x: 140, y: 130 },
+            { x: 170, y: 105 }, { x: 200, y: 140 }, { x: 230, y: 115 }, { x: 250, y: 90 }
+        ]
+    }), [genuineSignature]);
     
-    const genuineFeatures = [0.8, 0.7, 0.9, 0.6, 0.8, 0.7];
-    const forgedFeatures = [0.4, 0.3, 0.5, 0.2, 0.4, 0.3];
+    const genuineFeatures = useMemo(() => [0.8, 0.7, 0.9, 0.6, 0.8, 0.7], []);
+    const forgedFeatures = useMemo(() => [0.4, 0.3, 0.5, 0.2, 0.4, 0.3], []);
     
-    const handleForgerySelect = (type) => {
+    const handleForgerySelect = useCallback((type) => {
         setSelectedForgery(type);
-        // Simulate different scores for different forgery types
         const scores = {
             traced: 0.55,
             fast: 0.40,
-            distorted: 0.35,
-            random: 0.20
+            distorted: 0.30,
+            random: 0.15
         };
-        setForgedScore(scores[type]);
-    };
+        setForgedScore(scores[type] || 0.45);
+    }, []);
+    
+    const mockDTWPath = useMemo(() => [
+        [0,0], [1,1], [2,2], [3,3], [4,4], [5,5],
+        [6,6], [7,7], [8,8], [9,9], [10,10], [11,11]
+    ], []);
     
     return (
-        <div style={{ padding: '20px', backgroundColor: '#f9fafb', borderRadius: '12px' }}>
-            <h2 style={{ marginBottom: '20px', color: '#1f2937' }}>Forgery Replay Demo</h2>
+        <div style={{ padding: '20px', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '10px', color: '#1f2937' }}>
+                🛡️ Forgery &amp; Replay Detection Visualizer
+            </h2>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '20px' }}>
+                Simulate how BioP2 detects various signature forgery types using hybrid DTW, Siamese neural network embeddings, and behavioral dynamics.
+            </p>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div>
-                    <ForgeryTypeSelector 
-                        selectedType={selectedForgery} 
-                        onSelect={handleForgerySelect}
-                    />
-                    
-                    <SignatureComparison 
-                        genuine={genuineSignature}
-                        forged={forgedSignatures[selectedForgery]}
-                        dtwPath={[]} // Would be computed from DTW
-                    />
-                </div>
-                
-                <div>
-                    <ConfidenceComparison 
-                        genuineScore={genuineScore}
-                        forgedScore={forgedScore}
-                    />
-                    
-                    <div style={{ marginTop: '20px' }}>
-                        <FeatureDifference 
-                            genuineFeatures={genuineFeatures}
-                            forgedFeatures={forgedFeatures}
-                        />
-                    </div>
-                    
-                    <div style={{ 
-                        marginTop: '20px', 
-                        padding: '20px', 
-                        backgroundColor: 'white', 
-                        borderRadius: '8px',
-                        border: '1px solid #e5e7eb'
-                    }}>
-                        <h4 style={{ margin: '0 0 15px 0', color: '#1f2937' }}>Detection Result</h4>
-                        <div style={{ 
-                            padding: '15px', 
-                            backgroundColor: forgedScore < 0.5 ? '#dcfce7' : '#fee2e2',
-                            borderRadius: '8px',
-                            border: `1px solid ${forgedScore < 0.5 ? '#22c55e' : '#ef4444'}`
-                        }}>
-                            <div style={{ 
-                                fontSize: '20px', 
-                                fontWeight: 'bold',
-                                color: forgedScore < 0.5 ? '#166534' : '#991b1b'
-                            }}>
-                                {forgedScore < 0.5 ? '✅ FORGERY DETECTED' : '❌ FORGERY ACCEPTED'}
-                            </div>
-                            <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '5px' }}>
-                                Confidence: {(forgedScore * 100).toFixed(1)}%
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                {['traced', 'fast', 'distorted', 'random'].map(type => (
+                    <button
+                        key={type}
+                        onClick={() => handleForgerySelect(type)}
+                        style={{
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            border: '1px solid #d1d5db',
+                            backgroundColor: selectedForgery === type ? '#3b82f6' : '#fff',
+                            color: selectedForgery === type ? '#fff' : '#374151',
+                            cursor: 'pointer',
+                            textTransform: 'capitalize',
+                            fontWeight: '500'
+                        }}
+                    >
+                        {type} Forgery
+                    </button>
+                ))}
             </div>
             
-            <div style={{ marginTop: '20px', padding: '15px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-                <h4 style={{ margin: '0 0 10px 0', color: '#1f2937' }}>How It Works</h4>
-                <ul style={{ margin: 0, paddingLeft: '20px', color: '#6b7280', fontSize: '14px' }}>
-                    <li>Genuine signatures produce high confidence scores (&gt;80%)</li>
-                    <li>Forged signatures produce low confidence scores (&lt;50%)</li>
-                    <li>DTW alignment shows mismatch between genuine and forged paths</li>
-                    <li>Feature differences highlight behavioral inconsistencies</li>
-                    <li>System can detect various forgery types (traced, fast, distorted, random)</li>
-                </ul>
-            </div>
+            <SignatureComparison 
+                genuine={genuineSignature}
+                forged={forgedSignatures[selectedForgery]}
+                dtwPath={mockDTWPath}
+            />
+            
+            <ConfidenceComparison 
+                genuineScore={genuineScore}
+                forgedScore={forgedScore}
+            />
+            
+            <FeatureDifference 
+                genuineFeatures={genuineFeatures}
+                forgedFeatures={forgedFeatures}
+            />
         </div>
     );
 }

@@ -203,6 +203,12 @@ export function extractBehavioralFeatures(points, strokes) {
  *   Type B: wrong stroke count (completely different structure)
  *   Type C: random (no resemblance)
  */
+// Feature Indices Mapping for documentation & safe maintenance:
+// 0: strokeCount, 1: avgSpeed, 2: speedVar, 3: totalTime, 4: dirChanges, 5: avgCurvature,
+// 6: aspectRatio, 7: penLiftCount, 8: meanPressure, 9: pressureVar, 10: strokeDuration,
+// 11: meanAngularVel, 12: overallEntropy, 13: velocityEntropy, 14: rhythmRegularity,
+// 15: cadenceVariance, 16: rhythmScore, 17: cadenceConsistency, 18: totalPauseCount, 19: avgPauseDuration
+
 function generateNegativeSample(base) {
     const type = Math.floor(Math.random() * 3);
     const d = base.length;
@@ -211,27 +217,27 @@ function generateNegativeSample(base) {
         // Type A: wrong timing/speed — perturb speed, time, direction dims significantly
         const speedFactor = Math.random() > 0.5 ? 3.0 + Math.random() * 2 : 0.1 + Math.random() * 0.3;
         const neg = [...base];
-        neg[1] = base[1] * speedFactor;                              // avgSpeed
-        neg[2] = base[2] * (0.2 + Math.random());                   // speedVar
-        neg[3] = base[3] * speedFactor;                             // totalTime
-        neg[4] = Math.max(0, base[4] + Math.round((Math.random() - 0.5) * 15)); // dirChanges
-        neg[5] = base[5] * (0.2 + Math.random() * 2);             // curvature
-        // entropy/rhythm dims also perturbed
-        if (d > 12) { neg[12] = Math.random() * 3.5; neg[13] = Math.random() * 3.5; }
-        if (d > 14) { neg[14] = Math.random(); neg[15] = Math.random() * 500; }
-        if (d > 16) { neg[16] = Math.random(); neg[17] = Math.random(); }
-        if (d > 18) { neg[18] = Math.max(0, base[18] + Math.round((Math.random() - 0.5) * 5)); neg[19] = Math.random() * 2.0; }
+        neg[1] = base[1] * speedFactor;                              // [1] avgSpeed
+        neg[2] = base[2] * (0.2 + Math.random());                   // [2] speedVar
+        neg[3] = base[3] * speedFactor;                             // [3] totalTime
+        neg[4] = Math.max(0, base[4] + Math.round((Math.random() - 0.5) * 15)); // [4] dirChanges
+        neg[5] = base[5] * (0.2 + Math.random() * 2);             // [5] avgCurvature
+        // Entropy & rhythm dimensions
+        if (d > 12) { neg[12] = Math.random() * 3.5; neg[13] = Math.random() * 3.5; } // [12] overallEntropy, [13] velocityEntropy
+        if (d > 14) { neg[14] = Math.random(); neg[15] = Math.random() * 500; }        // [14] rhythmRegularity, [15] cadenceVariance
+        if (d > 16) { neg[16] = Math.random(); neg[17] = Math.random(); }             // [16] rhythmScore, [17] cadenceConsistency
+        if (d > 18) { neg[18] = Math.max(0, base[18] + Math.round((Math.random() - 0.5) * 5)); neg[19] = Math.random() * 2.0; } // [18] totalPauseCount, [19] avgPauseDuration
         return neg;
     } else if (type === 1) {
         // Type B: wrong stroke structure
         const extraStrokes = Math.floor(Math.random() * 4) + 1;
         const neg = [...base];
-        neg[0] = Math.max(1, base[0] + (Math.random() > 0.5 ? extraStrokes : -Math.min(extraStrokes, base[0] - 1)));
-        neg[1] = base[1] * (0.7 + Math.random() * 0.6);
-        neg[2] = base[2] * (0.5 + Math.random());
-        neg[3] = base[3] * (0.6 + Math.random() * 0.8);
-        neg[6] = base[6] * (0.4 + Math.random() * 1.2);
-        neg[7] = Math.max(0, base[7] + (Math.random() > 0.5 ? extraStrokes : -1));
+        neg[0] = Math.max(1, base[0] + (Math.random() > 0.5 ? extraStrokes : -Math.min(extraStrokes, base[0] - 1))); // [0] strokeCount
+        neg[1] = base[1] * (0.7 + Math.random() * 0.6);             // [1] avgSpeed
+        neg[2] = base[2] * (0.5 + Math.random());                  // [2] speedVar
+        neg[3] = base[3] * (0.6 + Math.random() * 0.8);            // [3] totalTime
+        neg[6] = base[6] * (0.4 + Math.random() * 1.2);            // [6] aspectRatio
+        neg[7] = Math.max(0, base[7] + (Math.random() > 0.5 ? extraStrokes : -1)); // [7] penLiftCount
         if (d > 14) { neg[14] = Math.random() * 0.3; neg[15] = base[15] * (2 + Math.random()); }
         if (d > 16) { neg[16] = Math.random() * 0.4; neg[17] = Math.random() * 0.4; }
         if (d > 18) { neg[18] = Math.max(0, base[18] + 2); neg[19] = base[19] * (1.5 + Math.random()); }

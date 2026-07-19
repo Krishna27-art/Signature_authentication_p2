@@ -22,10 +22,11 @@ import { getSignatureEmbedding, cosineSimilarity, normalizeCosineScore } from '.
 import { extractBehavioralFeatures } from './behavioral_model';
 import { fuseScores, dtwDistanceToSimilarity, ptDist, getDynamicThreshold, standardize, summarizeNearestDistances } from './score_fusion';
 import { fastDTW } from './enhanced_dtw';
-import { trainSiameseModel, compareSignaturesSiamese } from './siamese_network';
+import { loadSiameseModel, compareSignaturesSiamese } from './siamese_network';
 import { detectLiveness, preventReplayAttack } from './liveness_detection';
 import { protectTemplate, verifyCancelableTemplate } from './cancelable_biometrics';
 import { initDeviceCalibration, getDeviceCalibration, applyDeviceNormalization } from './device_calibration';
+import { getVerificationExplanation } from './explainable_verification';
 
 // ── IndexedDB + AES-GCM encrypted store ──────────────────
 const DB_NAME = "BiometricP2", STORE_NAME = "store";
@@ -323,6 +324,12 @@ export async function enrollSample(pts, state, partials, canvas, strokes) {
 
     // 2. Behavioral standardization
     const behaviorFeatures = await BDB.get("enroll_feats", []);
+    // A17 fix: guard against empty feature array (e.g. BDB returned [])
+    if (!behaviorFeatures || behaviorFeatures.length === 0 || !behaviorFeatures[0]) {
+        console.warn("[Enroll] No behavioral features collected — skipping standardization.");
+        await BDB.del("enroll_feats");
+        return { err: "Enrollment data incomplete. Please re-enroll." };
+    }
     const nF = behaviorFeatures[0].length;
     const mean = new Array(nF).fill(0);
     const std  = new Array(nF).fill(0);
@@ -334,8 +341,9 @@ export async function enrollSample(pts, state, partials, canvas, strokes) {
     }
     const standardizedFeatures = behaviorFeatures.map(f => standardize(f, { mean, std }));
     
-    // 3. Siamese Network (Uses globally pretrained model)
-    const siameseTrained = true;
+    // 3. Siamese Network (check if pre-trained model is loaded)
+    const siameseModel = await loadSiameseModel();
+    const siameseTrained = !!siameseModel;
 
     // 4. DTW threshold from pairwise enrollment distances
     const pairDistances = [];
@@ -370,7 +378,9 @@ export async function enrollSample(pts, state, partials, canvas, strokes) {
     const protectedTemplate = await protectTemplate(mean, await getDeviceHash());
 
     const ns = DEFAULT_STATE();
-    ns.template              = partials[Math.floor(partials.length / 2)]; // We still keep a single anchor for DTW
+    // A10 fix: ns.template was a dead assignment — verifySample only reads anchorSamples.
+    // Kept for backwards DB compat but no longer used in verification logic.
+    ns.template              = null;
     ns.anchorSamples         = [...partials];
     ns.threshold             = dtwThreshold;
     ns.imageEmbedding        = avgEmb;
@@ -479,19 +489,21 @@ export async function verifySample(pts, state, canvas, strokes) {
 
     // ── Behavioral Siamese BiLSTM model ───────────────────────────────────────
     let siameseScore = null;
-    let siameseUncertainty;
     if (state.siameseTrained && state.anchorSamples?.length) {
         try {
             const currentSeq  = extractSequenceFeatures(norm);
             const enrolledSeq = extractSequenceFeatures(state.anchorSamples[0]);
             const result = await compareSignaturesSiamese(currentSeq, enrolledSeq);
-            // result is { score, uncertainty }
-            siameseScore = result.score;
-            siameseUncertainty = result.uncertainty;
-            // Penalize score proportionally to uncertainty (max 10% penalty)
-            const uncertaintyPenalty = siameseUncertainty * 0.1;
-            siameseScore = Math.max(0, siameseScore - uncertaintyPenalty);
-            console.log(`[Verify] Siamese score=${siameseScore.toFixed(3)} uncertainty=${siameseUncertainty.toFixed(3)}`);
+            // A03 fix: guard against falsy result before accessing .score / .uncertainty
+            if (result && typeof result.score === 'number') {
+                const siameseUncertainty = typeof result.uncertainty === 'number' ? result.uncertainty : 0;
+                // Penalize score proportionally to uncertainty (max 10% penalty)
+                const uncertaintyPenalty = siameseUncertainty * 0.1;
+                siameseScore = Math.max(0, result.score - uncertaintyPenalty);
+                console.log(`[Verify] Siamese score=${siameseScore.toFixed(3)} uncertainty=${siameseUncertainty.toFixed(3)}`);
+            } else {
+                console.warn('[Verify] Siamese returned no result — skipping.');
+            }
         } catch (e) {
             console.warn('[Verify] Siamese model failed — skipping:', e.message);
             siameseScore = null;
@@ -562,11 +574,13 @@ export async function verifySample(pts, state, canvas, strokes) {
 
 
 
+        const explanation = getVerificationExplanation(state.anchorSamples[0], norm, final, threshold);
         await writeState(state);
-        return { pass: true, score: final, threshold };
+        return { pass: true, score: final, threshold, explanation };
     } else {
         state.attempts++;
+        const explanation = getVerificationExplanation(state.anchorSamples[0], norm, final, threshold);
         await writeState(state);
-        return { fail: "Signature not matched.", score: final, threshold, attempts: state.attempts };
+        return { fail: "Signature not matched.", score: final, threshold, attempts: state.attempts, explanation };
     }
 }

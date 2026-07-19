@@ -305,5 +305,7 @@ function calculateVelocity(p1, p2) {
  * Helper: Calculate variance
  */
 function calculateVariance(values, mean) {
+    // A06 fix: guard against empty array to prevent NaN from 0-length division
+    if (!values || values.length === 0) return 0;
     return values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length;
 }

@@ -138,25 +138,30 @@ async function main() {
     const negatives = [];
     
     console.log("Generating multi-user training triplets...");
+    const blueprintKeys = ['userA', 'userB', 'userC'];
     for (let u = 0; u < userNames.length; u++) {
-        const currentUser = userNames[u];
-        // Generate 15 genuine signatures
+        const userBlueprint = blueprintKeys[u % blueprintKeys.length];
+        const otherBlueprint = blueprintKeys[(u + 1) % blueprintKeys.length];
+
+        // Generate 15 genuine signatures with user-specific scaling
         const genuines = [];
+        const userScale = 0.7 + (u % 5) * 0.15;
         for (let i = 0; i < 15; i++) {
-            // Generate using blueprints (modulating parameters)
-            const raw = generateGenuine('userA', 3 + Math.random() * 3, 0.8 + Math.random() * 0.4);
+            const raw = generateGenuine(userBlueprint, 2 + Math.random() * 3, userScale);
             genuines.push(normalizeAndExtract(raw));
         }
-        
+
         // Generate positive/negative pairs
         for (let i = 0; i < genuines.length; i++) {
             const anchor = genuines[i];
             const positive = genuines[(i + 1) % genuines.length];
-            
-            // Negative signature from a different user or heavily perturbed
-            const otherRaw = generateGenuine('userB', 8 + Math.random() * 5);
-            const negative = normalizeAndExtract(otherRaw);
-            
+
+            // Use combination of hard impostor forgery and distinct user blueprint for negative
+            const negativeRaw = (i % 2 === 0)
+                ? generateImpostor(userBlueprint)
+                : generateGenuine(otherBlueprint, 6 + Math.random() * 4);
+            const negative = normalizeAndExtract(negativeRaw);
+
             anchors.push(anchor);
             positives.push(positive);
             negatives.push(negative);

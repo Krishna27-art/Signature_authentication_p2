@@ -9,6 +9,18 @@ import { BDB } from './biometrics';
 export const USER_DB_KEY = 'user_registry';
 
 /**
+ * Get user profile (sync helper for UI components)
+ */
+export function getUserProfile(userId) {
+    return {
+        id: userId,
+        name: userId === 'primary_user' ? 'Primary User' : userId,
+        metadata: { handedness: 'right', device: 'touch' }
+    };
+}
+
+
+/**
  * Initialize user registry if not exists
  */
 export async function initUserRegistry() {

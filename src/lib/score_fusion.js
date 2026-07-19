@@ -7,16 +7,29 @@ export const DTW_SCALE_MULTIPLIER = 3.0;
 export const DTW_MIN_THRESHOLD = 0.08;
 
 // Model Fusion Weights
-export const BASE_DTW_WEIGHT = 0.45;
-export const BASE_SIAMESE_WEIGHT = 0.40;
-export const BASE_BEHAVIOR_WEIGHT = 0.15;
-export const BASE_IMAGE_WEIGHT = 0.10;
+// A11 fix: these are RELATIVE weights — weightedAverage() renormalises by the
+// sum of active (non-null) weights at runtime, so they need not sum to 1.0.
+// Previous values summed to 1.10 which was misleading.
+// New values preserve the same ratios and sum to exactly 1.0:
+//   DTW:Siamese:Behavior:Image = 45:40:15:10 → 0.41:0.36:0.14:0.09 (≈ same ratio)
+export const BASE_DTW_WEIGHT      = 0.41;
+export const BASE_SIAMESE_WEIGHT  = 0.36;
+export const BASE_BEHAVIOR_WEIGHT = 0.14;
+export const BASE_IMAGE_WEIGHT    = 0.09;
 
 // Dynamic Threshold Settings
 export const COLD_START_THRESHOLD = 62;
 export const THRESHOLD_OFFSET = 8;
 export const MIN_DYNAMIC_THRESHOLD = 60;
 export const MAX_DYNAMIC_THRESHOLD = 80;
+
+export const FINE_POINTER_OFFSET = 6;
+export const FINE_MIN_THRESHOLD = 65;
+export const FINE_MAX_THRESHOLD = 85;
+
+export const COARSE_POINTER_OFFSET = 10;
+export const COARSE_MIN_THRESHOLD = 55;
+export const COARSE_MAX_THRESHOLD = 75;
 
 // PT Distance Normalization Weights & Scales
 export const MAX_VELOCITY_SCALE = 5.0;
@@ -167,13 +180,13 @@ export function getDynamicThreshold(avgScore, calibration = null) {
     if (calibration && calibration.profile) {
         const { pointerType } = calibration.profile;
         if (pointerType === 'fine') {
-            offset = 6;
-            minThreshold = 65;
-            maxThreshold = 85;
+            offset = FINE_POINTER_OFFSET;
+            minThreshold = FINE_MIN_THRESHOLD;
+            maxThreshold = FINE_MAX_THRESHOLD;
         } else if (pointerType === 'coarse') {
-            offset = 10;
-            minThreshold = 55;
-            maxThreshold = 75;
+            offset = COARSE_POINTER_OFFSET;
+            minThreshold = COARSE_MIN_THRESHOLD;
+            maxThreshold = COARSE_MAX_THRESHOLD;
         }
     }
 

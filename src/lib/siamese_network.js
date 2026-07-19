@@ -1,3 +1,4 @@
+/* global process */
 /**
  * siamese_network.js — Siamese BiLSTM with Triplet Loss + Attention
  *
@@ -53,6 +54,16 @@ export async function loadSiameseModel() {
     } catch (e) {
         console.warn('⚠️ Failed to load Siamese model:', e.message);
         return null;
+    }
+}
+
+export async function saveSiameseModel(model) {
+    cachedSiameseModel = model;
+    try {
+        await model.save(SIAMESE_MODEL_URL);
+        console.log('✅ Siamese model saved to IndexedDB.');
+    } catch (e) {
+        console.warn('⚠️ Could not save Siamese model:', e.message);
     }
 }
 

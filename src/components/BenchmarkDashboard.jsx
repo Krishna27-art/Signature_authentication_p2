@@ -9,7 +9,7 @@
  * - Accuracy metrics
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 /**
  * Genuine vs Forged Score Distribution

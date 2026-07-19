@@ -926,12 +926,13 @@ export class MobileHardwareIntegration {
         this.qualityChecker.reset();
     }
     
-    async stop() {
+    // A08 fix: Generic Sensor API stop() is synchronous — remove spurious await
+    stop() {
         if (this.accelerometer) {
-            await this.accelerometer.stop();
+            this.accelerometer.stop();
         }
         if (this.gyroscope) {
-            await this.gyroscope.stop();
+            this.gyroscope.stop();
         }
         this.isInitialized = false;
     }

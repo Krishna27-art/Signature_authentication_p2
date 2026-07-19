@@ -27,7 +27,10 @@ export function analyzeSpeed(signature) {
         const velocity = Math.sqrt(dx * dx + dy * dy) / dt;
         velocities.push(velocity);
         
-        if (i > 1) {
+        if (velocities.length >= 2) {
+            // A07 fix: reference the second-to-last element by index, not by
+            // (velocities.length - 2) which was undefined when i===1 because
+            // velocities had only one entry at that point in the loop.
             const prevVel = velocities[velocities.length - 2];
             const acceleration = (velocity - prevVel) / dt;
             accelerations.push(acceleration);

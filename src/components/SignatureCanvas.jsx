@@ -11,10 +11,10 @@ const SignatureCanvas = forwardRef(({ onStrokeChange }, ref) => {
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    ctx.lineWidth = 2.8;
+    ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#1a1a2e';
+    ctx.strokeStyle = '#1e1b4b'; // deep indigo ink on white
   }, []);
 
   useImperativeHandle(ref, () => ({
@@ -142,9 +142,14 @@ const SignatureCanvas = forwardRef(({ onStrokeChange }, ref) => {
         onPointerUp={stopDrawing}
         onPointerLeave={stopDrawing}
         onPointerCancel={stopDrawing}
-        style={{ touchAction: 'none', width: '100%', height: 'auto' }}
+        style={{ touchAction: 'none', display: 'block', width: '100%', height: '100%' }}
       />
-      {strokeCount === 0 && !isDrawing.current && <div className="canvas-hint">✍ Draw here</div>}
+      {strokeCount === 0 && !isDrawing.current && (
+        <div className="canvas-hint">
+          <span style={{ fontSize: '28px', opacity: 0.35 }}>✍️</span>
+          <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500 }}>Sign here</span>
+        </div>
+      )}
     </div>
   );
 });

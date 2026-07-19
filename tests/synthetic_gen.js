@@ -221,3 +221,37 @@ export function generateBatch(user = 'userA', n = 100) {
     impostor: Array.from({ length: n }, () => generateImpostor(user)),
   };
 }
+
+/**
+ * Generate a SKILLED FORGERY attempt: tries to match the target's shape
+ * but with proportions, curvature, and timing errors.
+ */
+export function generateSkilledForgery(user = 'userA', skillLevel = 0.5) {
+  // skillLevel: 0 = poor imitation, 1 = near-perfect trace
+  const blueprint = BLUEPRINTS[user];
+
+  // A forger copies rough control-point positions but gets proportions,
+  // curvature, and timing wrong in proportion to their skill.
+  const shapeError = (1 - skillLevel) * 25;      // px error in copied geometry
+  const timingError = (1 - skillLevel) * 0.6;    // rhythm mismatch — forgers hesitate
+
+  let allPoints = [];
+  let t = 0;
+  for (const [p0, p1, p2, p3] of blueprint) {
+    const perturb = (p) => ({ x: p.x + gauss(shapeError), y: p.y + gauss(shapeError) });
+    const pts = sampleBezier(perturb(p0), perturb(p1), perturb(p2), perturb(p3), 32);
+    // forgers move slower/more hesitantly than the real signer, especially early on
+    const timed = addTiming(pts, 3 * (1 + timingError), t);
+    allPoints = allPoints.concat(timed);
+    t = allPoints[allPoints.length - 1].t + 200;
+  }
+  return allPoints;
+}
+
+/**
+ * Alias for generateImpostor representing random forgery.
+ */
+export function generateRandomForgery(enrolledUser = 'userA') {
+  return generateImpostor(enrolledUser);
+}
+

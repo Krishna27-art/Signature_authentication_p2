@@ -301,6 +301,8 @@ function calculateEntropy(probabilities) {
  * Helper: Calculate variance
  */
 function calculateVariance(values, mean) {
+    // A05 fix: guard against empty array to prevent NaN from 0-length division
+    if (!values || values.length === 0) return 0;
     return values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length;
 }
 

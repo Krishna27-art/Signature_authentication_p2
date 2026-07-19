@@ -10,7 +10,7 @@
  * - Real-time verification metrics
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 /**
  * DTW Alignment Visualization Component

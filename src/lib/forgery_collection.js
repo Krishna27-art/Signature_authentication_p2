@@ -20,6 +20,8 @@ function normalize(pts, n = 64) {
 }
 
 const FORGERY_DB_KEY = 'forgery_registry';
+// A09 fix: was hardcoded magic number 20 inside validateForgeryData
+const MIN_FORGERY_POINTS = 20;
 
 /**
  * Initialize forgery registry
@@ -67,7 +69,7 @@ export async function recordForgery(forgeryData) {
     const registry = await BDB.get(FORGERY_DB_KEY);
     
     const forgery = {
-        id: `forgery_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `forgery_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
         timestamp: Date.now(),
         targetUserId: forgeryData.targetUserId,
         forgerId: forgeryData.forgerId || 'unknown',
@@ -291,8 +293,8 @@ export function validateForgeryData(forgeryData) {
         errors.push('Forgery type is required');
     }
     
-    if (!forgeryData.rawPoints || forgeryData.rawPoints.length < 20) {
-        errors.push('Signature must have at least 20 points');
+    if (!forgeryData.rawPoints || forgeryData.rawPoints.length < MIN_FORGERY_POINTS) {
+        errors.push(`Signature must have at least ${MIN_FORGERY_POINTS} points`);
     }
     
     if (!['random', 'skilled', 'traced', 'pressure_copy'].includes(forgeryData.forgeryType)) {

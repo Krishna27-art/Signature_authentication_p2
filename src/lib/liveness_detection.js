@@ -219,12 +219,14 @@ export function detectBehavioralAnomaly(points, state = null) {
     
     // Check 4: Check against historical behavior
     if (state && state.behaviorFeatureHistory && state.behaviorFeatureHistory.length > 5) {
-        const currentFeatures = extractBasicFeatures(points);
+        // A01 fix: extractBasicFeatures returns Array<Array<number>> (2D).
+        // cosineSimilarity expects flat 1D arrays. Flatten before comparison.
+        const currentFeatures = extractBasicFeatures(points).flat();
         const historicalFeatures = state.behaviorFeatureHistory;
-        
+
         const maxSimilarity = Math.max(
-            ...historicalFeatures.map(hist => 
-                cosineSimilarity(currentFeatures, hist)
+            ...historicalFeatures.map(hist =>
+                cosineSimilarity(currentFeatures, Array.isArray(hist[0]) ? hist.flat() : hist)
             )
         );
         
