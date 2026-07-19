@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BioSign Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f0f13; color: #e0e0e8; padding: 24px; }
+    h1 { font-size: 24px; margin-bottom: 16px; }
+    .card { background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .stat { display: inline-block; margin-right: 24px; }
+    .stat-label { font-size: 12px; color: #666; text-transform: uppercase; }
+    .stat-value { font-size: 28px; font-weight: 700; color: #1d9e75; }
+    button { padding: 10px 20px; background: #6c63ff; color: white; border: none; border-radius: 8px; cursor: pointer; }
+    button:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <h1>🎉 Authentication Successful</h1>
+  <div class="card">
+    <div class="stat">
+      <div class="stat-label">Status</div>
+      <div class="stat-value">Authenticated</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Last Login</div>
+      <div class="stat-value" id="lastLogin">—</div>
+    </div>
+  </div>
+  <div class="card">
+    <button onclick="downloadData()">Export Biometric Data</button>
+    <button onclick="logout()" style="background: #d85a30; margin-left: 12px;">Logout</button>
+  </div>
+  <script>
+    // Check authentication
+    const authenticated = localStorage.getItem('authenticated');
+    if (authenticated !== 'true') {
+      window.location.href = 'index.html';
+    }
+
+    // Display last login time
+    const stats = JSON.parse(localStorage.getItem('sig_stats') || '{}');
+    if (stats.lastLogin) {
+      document.getElementById('lastLogin').textContent = new Date(stats.lastLogin).toLocaleString();
+    }
+
+    function logout() {
+      localStorage.removeItem('authenticated');
+      window.location.href = 'index.html';
+    }
+
+    function downloadData() {
+      const data = {
+        template: JSON.parse(localStorage.getItem('sig_template')),
+        threshold: JSON.parse(localStorage.getItem('sig_threshold')),
+        globalFeat: JSON.parse(localStorage.getItem('sig_global_feat')),
+        stats: stats,
+        history: JSON.parse(localStorage.getItem('sig_login_history'))
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'signature_data.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>

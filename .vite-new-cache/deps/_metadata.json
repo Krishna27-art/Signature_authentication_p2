@@ -1,0 +1,60 @@
+{
+  "hash": "f01232a9",
+  "configHash": "226c13e2",
+  "lockfileHash": "4fc2b2c8",
+  "browserHash": "3dc6e3e1",
+  "optimized": {
+    "@tensorflow/tfjs": {
+      "src": "../../node_modules/@tensorflow/tfjs/dist/index.js",
+      "file": "@tensorflow_tfjs.js",
+      "fileHash": "f611aaa9",
+      "needsInterop": false
+    },
+    "@xenova/transformers": {
+      "src": "../../node_modules/@xenova/transformers/src/transformers.js",
+      "file": "@xenova_transformers.js",
+      "fileHash": "083f918e",
+      "needsInterop": false
+    },
+    "react-dom": {
+      "src": "../../node_modules/react-dom/index.js",
+      "file": "react-dom.js",
+      "fileHash": "1cb88a18",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "828c9245",
+      "needsInterop": true
+    },
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "4ff03420",
+      "needsInterop": true
+    },
+    "react/jsx-dev-runtime": {
+      "src": "../../node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "da05649d",
+      "needsInterop": true
+    },
+    "react/jsx-runtime": {
+      "src": "../../node_modules/react/jsx-runtime.js",
+      "file": "react_jsx-runtime.js",
+      "fileHash": "2f8c8e83",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "browser-external_fs-D293lEsQ": {
+      "file": "browser-external_fs-D293lEsQ.js",
+      "isDynamicEntry": false
+    },
+    "chunk-MlKJSoC1": {
+      "file": "chunk-MlKJSoC1.js",
+      "isDynamicEntry": false
+    }
+  }
+}
