@@ -19,13 +19,12 @@
    ========================================================= */
 
 import { getSignatureEmbedding, cosineSimilarity, normalizeCosineScore } from './image_model';
-import { extractBehavioralFeatures, trainBehavioralModel, saveModel, loadModel, predictBehavior, retrainBehavioralModel } from './behavioral_model';
+import { extractBehavioralFeatures } from './behavioral_model';
 import { fuseScores, dtwDistanceToSimilarity, ptDist, getDynamicThreshold, standardize, summarizeNearestDistances } from './score_fusion';
 import { fastDTW } from './enhanced_dtw';
 import { trainSiameseModel, compareSignaturesSiamese } from './siamese_network';
 import { detectLiveness, preventReplayAttack } from './liveness_detection';
 import { protectTemplate, verifyCancelableTemplate } from './cancelable_biometrics';
-import { calculatePerformanceMetrics } from './evaluation_metrics';
 import { initDeviceCalibration, getDeviceCalibration, applyDeviceNormalization } from './device_calibration';
 
 // ── IndexedDB + AES-GCM encrypted store ──────────────────
@@ -46,6 +45,9 @@ export const BDB = {
             r.onerror = e => rej(e);
         });
     },
+    // SECURITY NOTE: appSecret is a public constant in the JS bundle. This AES-GCM
+    // layer stops casual devtools inspection and accidental leakage, but does NOT
+    // stop an attacker who can read the deployed source. See Phase 5 for the real fix.
     async _initKey() {
         // DEPLOYMENT FIX: Key is derived ONLY from the random salt stored
         // in localStorage — NOT from userAgent/screen dimensions.
@@ -332,15 +334,6 @@ export async function enrollSample(pts, state, partials, canvas, strokes) {
     }
     const standardizedFeatures = behaviorFeatures.map(f => standardize(f, { mean, std }));
     
-    // Train Behavioral Model
-    let behaviorModel = null;
-    try {
-        behaviorModel = await trainBehavioralModel(standardizedFeatures, 40);
-        await saveModel(behaviorModel);
-    } catch (err) {
-        console.warn("Behavioral model training failed:", err.message);
-    }
-
     // 3. Train Siamese Network with Triplet Loss (BiLSTM Sequence Encoder)
     let siameseTrained = false;
     try {
@@ -414,7 +407,7 @@ export async function enrollSample(pts, state, partials, canvas, strokes) {
     ns.anchorSamples         = [...partials];
     ns.threshold             = dtwThreshold;
     ns.imageEmbedding        = avgEmb;
-    ns.behavioralTrained     = behaviorModel !== null;
+    ns.behavioralTrained     = false;
     ns.siameseTrained        = siameseTrained;
     ns.behavioralStats       = { mean, std };
     ns.protectedTemplate     = protectedTemplate;
@@ -440,60 +433,57 @@ export async function verifySample(pts, state, canvas, strokes) {
     if (!state?.anchorSamples?.length)
         return { err: "No enrolled signature found. Please enroll again." };
 
-    // Anti-Spoofing & Liveness - DISABLED TEMPORARILY FOR DEBUGGING
-    // const replayCheck = preventReplayAttack(pts);
-    // if (replayCheck.isReplay) {
-    //     return { err: `Replay Attack Detected (${Math.round(replayCheck.confidence * 100)}% Match).` };
-    // }
+    // Anti-Spoofing & Liveness
+    const replayCheck = preventReplayAttack(pts);
+    if (replayCheck.isReplay) {
+        return { err: `Replay Attack Detected (${Math.round(replayCheck.confidence * 100)}% Match).` };
+    }
 
-    // const livenessCheck = detectLiveness(pts, state);
-    // if (!livenessCheck.isLive) {
-    //     return { err: `Liveness Failed: ${livenessCheck.reasons.join(', ')}` };
-    // }
+    const livenessCheck = detectLiveness(pts, state);
+    if (!livenessCheck.isLive) {
+        return { err: `Liveness Failed: ${livenessCheck.reasons.join(', ')}` };
+    }
 
-    // Initialize device calibration if not already done - DISABLED TEMPORARILY FOR DEBUGGING
-    // await initDeviceCalibration();
-    // const calibration = await getDeviceCalibration();
+    // Initialize device calibration if not already done
+    await initDeviceCalibration();
+    const calibration = await getDeviceCalibration();
 
-    // Apply device normalization - DISABLED TEMPORARILY FOR DEBUGGING
+    // Apply device normalization
     let normalizedPts = [...pts];
-    // if (calibration) {
-    //     normalizedPts = applyDeviceNormalization(normalizedPts, calibration);
-    // }
+    if (calibration) {
+        normalizedPts = applyDeviceNormalization(normalizedPts, calibration);
+    }
 
     const norm = normalize(normalizedPts, 64);
     if (!norm) return { err: "Signature too short or too small." };
 
-    // ── Path length check (half-signature detection) - DISABLED TEMPORARILY FOR DEBUGGING
-    // if (state.enrolledPathLength != null) {
-    //     const currentLen = rawPathLen(norm);
-    //     const ratio = currentLen / state.enrolledPathLength;
+    // ── Path length check (half-signature detection)
+    if (state.enrolledPathLength != null) {
+        const currentLen = rawPathLen(norm);
+        const ratio = currentLen / state.enrolledPathLength;
 
-    //     // DEPLOYMENT FIX: ratio window widened to 0.30–3.0.
-    //     // On mobile, the same person drawing on a phone vs a tablet
-    //     // produces different path lengths due to canvas size differences.
-    //     // Use 3× std as additional buffer if available.
-    //     const stdBuffer = state.enrolledPathLengthStd
-    //         ? (state.enrolledPathLengthStd / state.enrolledPathLength) * 3
-    //         : 0.4;
-    //     const minRatio = Math.max(0.25, 0.50 - stdBuffer);
-    //     const maxRatio = Math.min(4.0,  2.00 + stdBuffer);
+        // DEPLOYMENT FIX: ratio window widened to 0.30–3.0.
+        const stdBuffer = state.enrolledPathLengthStd
+            ? (state.enrolledPathLengthStd / state.enrolledPathLength) * 3
+            : 0.4;
+        const minRatio = Math.max(0.25, 0.50 - stdBuffer);
+        const maxRatio = Math.min(4.0,  2.00 + stdBuffer);
 
-    //     console.log(`[Verify] Path ratio: ${ratio.toFixed(2)} (allowed: ${minRatio.toFixed(2)}–${maxRatio.toFixed(2)})`);
+        console.log(`[Verify] Path ratio: ${ratio.toFixed(2)} (allowed: ${minRatio.toFixed(2)}–${maxRatio.toFixed(2)})`);
 
-    //     if (ratio < minRatio || ratio > maxRatio) {
-    //         return { err: `Signature size mismatch (${Math.round(ratio * 100)}% of enrolled). Draw your full signature.` };
-    //     }
-    // }
+        if (ratio < minRatio || ratio > maxRatio) {
+            return { err: `Signature size mismatch (${Math.round(ratio * 100)}% of enrolled). Draw your full signature.` };
+        }
+    }
 
-    // ── Stroke count soft penalty - DISABLED TEMPORARILY FOR DEBUGGING
+    // ── Stroke count soft penalty
     const currentStrokeCount = strokes ? strokes.length : 1;
     let strokePenalty = 0;
-    // if (state.enrolledStrokeCount != null) {
-    //     const diff = Math.abs(currentStrokeCount - state.enrolledStrokeCount);
-    //     strokePenalty = diff * 1; // Reduced from 3 to 1 point per extra/missing stroke
-    //     if (diff > 0) console.log(`[Verify] Stroke diff: ${diff} → penalty ${strokePenalty}`);
-    // }
+    if (state.enrolledStrokeCount != null) {
+        const diff = Math.abs(currentStrokeCount - state.enrolledStrokeCount);
+        strokePenalty = diff * 1; // Reduced from 3 to 1 point per extra/missing stroke
+        if (diff > 0) console.log(`[Verify] Stroke diff: ${diff} → penalty ${strokePenalty}`);
+    }
 
     // ── DTW ───────────────────────────────────────────────
     const all = [...state.anchorSamples, ...(state.adaptSamples || [])];
@@ -501,8 +491,8 @@ export async function verifySample(pts, state, canvas, strokes) {
     const dtwFinal = summarizeNearestDistances(dtwDistances, Math.min(3, dtwDistances.length));
     const dtwSimilarity = dtwDistanceToSimilarity(dtwFinal, state.threshold);
 
-    console.log(`[Verify] DTW distances: [${dtwDistances.map(d => d.toFixed(4)).join(', ')}]`);
-    console.log(`[Verify] DTW final=${dtwFinal.toFixed(4)}, threshold=${state.threshold.toFixed(4)}, similarity=${dtwSimilarity.toFixed(1)}`);
+    console.log(`[Verify] DTW distances: [${dtwDistances.map(d => d?.toFixed(4)).join(', ')}]`);
+    console.log(`[Verify] DTW final=${dtwFinal?.toFixed?.(4)}, threshold=${state?.threshold?.toFixed?.(4)}, similarity=${dtwSimilarity?.toFixed?.(1)}`);
 
     // ── Image model (fully non-fatal) ─────────────────────
     let imageScore = null;
@@ -522,7 +512,7 @@ export async function verifySample(pts, state, canvas, strokes) {
 
     // ── Behavioral Siamese BiLSTM model ───────────────────────────────────────
     let siameseScore = null;
-    let siameseUncertainty = 1.0;
+    let siameseUncertainty;
     if (state.siameseTrained && state.anchorSamples?.length) {
         try {
             const currentSeq  = extractSequenceFeatures(norm);
@@ -565,17 +555,16 @@ export async function verifySample(pts, state, canvas, strokes) {
     const final    = Math.max(0, rawFused - strokePenalty);
     const threshold = getDynamicThreshold(state.avgScore);
 
-    // ── Session anomaly detection - DISABLED TEMPORARILY FOR DEBUGGING
+    // ── Session anomaly detection
     // Flag sharp deviations from the user's baseline that may indicate session hijack
-    const sessionAnomaly = false; // Disabled
-    // const sessionAnomaly = (() => {
-    //     const hist = state.verificationHistory || [];
-    //     const recent = hist.filter(h => h.passed).slice(-10);
-    //     if (recent.length < 5) return false;
-    //     const avgPastScore = recent.reduce((s, h) => s + h.score, 0) / recent.length;
-    //     const drop = avgPastScore - final;
-    //     return drop > 35; // Increased from 25 to 35 to reduce false positives
-    // })();
+    const sessionAnomaly = (() => {
+        const hist = state.verificationHistory || [];
+        const recent = hist.filter(h => h.passed).slice(-10);
+        if (recent.length < 5) return false;
+        const avgPastScore = recent.reduce((s, h) => s + h.score, 0) / recent.length;
+        const drop = avgPastScore - final;
+        return drop > 35; // Increased from 25 to 35 to reduce false positives
+    })();
     if (sessionAnomaly) {
         console.warn('[Verify] ⚠️ Session anomaly detected — score dropped sharply from historical baseline.');
     }
@@ -606,18 +595,7 @@ export async function verifySample(pts, state, canvas, strokes) {
         if (state.adaptSamples.length >= 10) state.adaptSamples.shift();
         state.adaptSamples.push(norm);
 
-        // Retrain behavioral model every 5 logins once mature
-        if (state.behavioralTrained && state.successfulLoginCount >= 10 && state.successfulLoginCount % 5 === 0) {
-            try {
-                const model = await loadModel();
-                if (model) {
-                    await retrainBehavioralModel(model, stdCurrentFeat, state.behaviorFeatureHistory, 20);
-                    await saveModel(model);
-                    state.lastBehavioralRetrainAt = Date.now();
-                    console.log("[Verify] Behavioral model retrained.");
-                }
-            } catch (err) { console.warn("Retraining failed:", err.message); }
-        }
+
 
         await writeState(state);
         return { pass: true, score: final, threshold };

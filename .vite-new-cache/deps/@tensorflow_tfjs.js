@@ -1,5 +1,4 @@
-import { a as __toESM, r as __exportAll, t as __commonJSMin } from "./chunk-MlKJSoC1.js";
-import { t as require_browser_external_fs } from "./browser-external_fs-D293lEsQ.js";
+import { n as __exportAll, r as __toESM, t as __commonJSMin } from "./chunk-CYJPkc-J.js";
 //#region node_modules/@tensorflow/tfjs-core/dist/backends/backend.js
 /**
 * @license
@@ -61285,6 +61284,13 @@ var getRequestInitFromRequest = (request) => {
 function isLocalPath(source) {
 	return typeof source === "string" && source.slice(0, 7) === "file://";
 }
+//#endregion
+//#region browser-external:fs
+var require_browser_external_fs = /* @__PURE__ */ __commonJSMin(((exports, module) => {
+	module.exports = Object.create(new Proxy({}, { get(_, key) {
+		if (key !== "__esModule" && key !== "__proto__" && key !== "constructor" && key !== "splice") console.warn(`Module "fs" has been externalized for browser compatibility. Cannot access "fs.${key}" in client code. See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.`);
+	} }));
+}));
 //#endregion
 //#region node_modules/@tensorflow/tfjs-data/dist/sources/file_data_source.js
 /**

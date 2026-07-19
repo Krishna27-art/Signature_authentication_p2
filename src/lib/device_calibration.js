@@ -91,10 +91,6 @@ function estimateSamplingRate() {
  * Check pressure support
  */
 function checkPressureSupport() {
-    // Check if pointer events support pressure
-    const testCanvas = document.createElement('canvas');
-    const ctx = testCanvas.getContext('2d');
-    
     // Try to detect pressure support
     let hasPressure = false;
     let pressureRange = { min: 0, max: 1 };
@@ -139,7 +135,7 @@ function getMaxCanvasSize() {
         if (testCanvas.width === 10000 && testCanvas.height === 10000) {
             return { width: 10000, height: 10000 };
         }
-    } catch (e) {
+    } catch {
         // Canvas size limit reached
     }
     

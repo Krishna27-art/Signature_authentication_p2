@@ -605,7 +605,6 @@ export function motionBasedLivenessDetection(motionData, expectedMotionProfile =
     // Compare with expected profile if available
     if (expectedMotionProfile) {
         const accelDiff = Math.abs(stats.avgAcceleration - expectedMotionProfile.avgAcceleration);
-        const rotationDiff = Math.abs(stats.avgRotation - expectedMotionProfile.avgRotation);
         
         if (accelDiff > expectedMotionProfile.avgAcceleration * 2) {
             isLive = false;
@@ -743,7 +742,6 @@ export function normalizeForDeviceOrientation(points, orientation) {
     
     // Apply rotation compensation based on device orientation
     const beta = orientation.beta * (Math.PI / 180); // X-axis rotation
-    const gamma = orientation.gamma * (Math.PI / 180); // Y-axis rotation
     
     return points.map(point => {
         // Rotate point to compensate for device tilt
@@ -753,8 +751,6 @@ export function normalizeForDeviceOrientation(points, orientation) {
         // Simple rotation compensation
         const cosBeta = Math.cos(beta);
         const sinBeta = Math.sin(beta);
-        const cosGamma = Math.cos(gamma);
-        const sinGamma = Math.sin(gamma);
         
         const rotatedX = x * cosBeta - y * sinBeta;
         const rotatedY = x * sinBeta + y * cosBeta;

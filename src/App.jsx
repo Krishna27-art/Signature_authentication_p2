@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { BDB, readState, enrollSample, verifySample, ENROLL_N } from './lib/biometrics';
 import { loadImageModel } from './lib/image_model';
-import { loadModel, saveModel, retrainBehavioralModel, extractBehavioralFeatures } from './lib/behavioral_model';
 import SignatureCanvas from './components/SignatureCanvas';
 
 function App() {
@@ -30,12 +29,11 @@ function App() {
           .then(() => setImageModelStatus('Ready ✓'))
           .catch(() => setImageModelStatus('Unavailable'));
 
-        loadModel()
-          .then(m => {
-            if (m) setBehaviorModelInfo('Loaded ✓');
-            else    setBehaviorModelInfo('Will train on enrollment');
-          })
-          .catch(() => setBehaviorModelInfo('Will train on enrollment'));
+        if (state?.siameseTrained) {
+          setBehaviorModelInfo('Ready ✓');
+        } else {
+          setBehaviorModelInfo('Will train on enrollment');
+        }
 
         setModelsReady(true);
       } catch (err) {
@@ -113,35 +111,8 @@ function App() {
           setVerifyCount(newCount);
           setStatus({ msg: `🔓 Access Granted  (${Math.round(result.score)}% confidence)`, type: 'ok' });
 
-          // ── Adaptive Learning ──────────────────────────────────
-          // Every successful verification, retrain the behavioral NN
-          // with this new signature so the model improves over time.
-          // We do this in the background so the UI stays responsive.
-          (async () => {
-            try {
-              const model = await loadModel();
-              if (!model) return;
-
-              const newFeatures  = extractBehavioralFeatures(raw, strokes);
-              const historical   = newState.anchorSamples || [];
-
-              const retrained = await retrainBehavioralModel(
-                model,
-                newFeatures,
-                historical,
-                20  // 20 fine-tune epochs — fast & effective
-              );
-
-              if (retrained) {
-                await saveModel(retrained);
-                setBehaviorModelInfo(`Adapted on ${newCount} verified signature${newCount > 1 ? 's' : ''} ✓`);
-                console.log(`🧠 Behavioral model updated after verification #${newCount}`);
-              }
-            } catch (e) {
-              console.warn('Adaptive retrain skipped:', e.message);
-            }
-          })();
-          // ── End Adaptive Learning ──────────────────────────────
+          // Updated status count for UI display
+          setBehaviorModelInfo(`Protected with Siamese BiLSTM ✓`);
 
         } else {
           setStatus({ msg: `🔒 Access Denied  (${Math.round(result.score)}% confidence)`, type: 'error' });

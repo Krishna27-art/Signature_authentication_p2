@@ -50,6 +50,7 @@
     "transform": {
       "^.+\\.js$": "babel-jest"
     },
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "testMatch": ["**/*.test.js"]
   }
 }

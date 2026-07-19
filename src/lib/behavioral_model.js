@@ -33,7 +33,7 @@ export async function saveModel(model) {
     await model.save(MODEL_URL);
 }
 
-const FEATURE_DIM = 16;
+const FEATURE_DIM = 20;
 
 function createModel() {
     const model = tf.sequential();
@@ -87,7 +87,6 @@ export function extractBehavioralFeatures(points, strokes) {
     let curvatureAccum   = 0;
     let curvatureCount   = 0;
     let prevDir          = null;
-    let prevSpeed        = 0;
 
     for (let i = 1; i < points.length; i++) {
         const prev = points[i - 1], curr = points[i];
@@ -110,7 +109,6 @@ export function extractBehavioralFeatures(points, strokes) {
             if (Math.abs(delta) > Math.PI / 6) directionChanges++;
         }
         prevDir = dir;
-        prevSpeed = spd;
     }
 
     const meanSpeed    = speeds.reduce((s, v) => s + v, 0) / Math.max(speeds.length, 1);
@@ -142,7 +140,7 @@ export function extractBehavioralFeatures(points, strokes) {
         const entropy = calculateTemporalEntropy(points);
         overallEntropy = entropy.overallEntropy || 0;
         velocityEntropy = entropy.velocityEntropy || 0;
-    } catch (_) { /* non-fatal */ }
+    } catch { /* non-fatal */ }
 
     // ── Rhythm features (features 14–15) ────────────────────────
     let rhythmRegularity = 0, cadenceVariance = 0;
@@ -151,7 +149,23 @@ export function extractBehavioralFeatures(points, strokes) {
         rhythmRegularity = rhythm.rhythmRegularity || 0;
         const cadence = extractSigningCadence(points, allStrokes);
         cadenceVariance = cadence.cadenceVariance || 0;
-    } catch (_) { /* non-fatal */ }
+    } catch { /* non-fatal */ }
+
+    // ── Cadence profile & rhythm score features (features 16–17) ──────────────
+    let rhythmScore = 0, cadenceConsistency = 0;
+    try {
+        const profile = profileSigningCadence(points, allStrokes);
+        rhythmScore = profile.rhythmScore || 0;
+        cadenceConsistency = profile.cadenceConsistency || 0;
+    } catch { /* non-fatal */ }
+
+    // ── Micro pause features (features 18–19) ──────────────────────────────────
+    let totalPauseCount = 0, avgPauseDuration = 0;
+    try {
+        const pauseInfo = detectMicroPauses(points, allStrokes);
+        totalPauseCount = pauseInfo.totalPauseCount || 0;
+        avgPauseDuration = pauseInfo.avgPauseDuration || 0;
+    } catch { /* non-fatal */ }
 
     return [
         strokeCount,
@@ -169,7 +183,11 @@ export function extractBehavioralFeatures(points, strokes) {
         overallEntropy,
         velocityEntropy,
         rhythmRegularity,
-        cadenceVariance
+        cadenceVariance,
+        rhythmScore,
+        cadenceConsistency,
+        totalPauseCount,
+        avgPauseDuration / 1000 // normalized to seconds
     ];
 }
 
@@ -201,6 +219,8 @@ function generateNegativeSample(base) {
         // entropy/rhythm dims also perturbed
         if (d > 12) { neg[12] = Math.random() * 3.5; neg[13] = Math.random() * 3.5; }
         if (d > 14) { neg[14] = Math.random(); neg[15] = Math.random() * 500; }
+        if (d > 16) { neg[16] = Math.random(); neg[17] = Math.random(); }
+        if (d > 18) { neg[18] = Math.max(0, base[18] + Math.round((Math.random() - 0.5) * 5)); neg[19] = Math.random() * 2.0; }
         return neg;
     } else if (type === 1) {
         // Type B: wrong stroke structure
@@ -213,6 +233,8 @@ function generateNegativeSample(base) {
         neg[6] = base[6] * (0.4 + Math.random() * 1.2);
         neg[7] = Math.max(0, base[7] + (Math.random() > 0.5 ? extraStrokes : -1));
         if (d > 14) { neg[14] = Math.random() * 0.3; neg[15] = base[15] * (2 + Math.random()); }
+        if (d > 16) { neg[16] = Math.random() * 0.4; neg[17] = Math.random() * 0.4; }
+        if (d > 18) { neg[18] = Math.max(0, base[18] + 2); neg[19] = base[19] * (1.5 + Math.random()); }
         return neg;
     } else {
         // Type C: fully random (simulates a completely different person)
@@ -227,6 +249,8 @@ function generateNegativeSample(base) {
         neg[7] = Math.floor(Math.random() * 4);
         if (d > 12) { neg[12] = Math.random() * 3.5; neg[13] = Math.random() * 3.5; }
         if (d > 14) { neg[14] = Math.random(); neg[15] = Math.random() * 500; }
+        if (d > 16) { neg[16] = Math.random(); neg[17] = Math.random(); }
+        if (d > 18) { neg[18] = Math.floor(Math.random() * 8); neg[19] = Math.random() * 3.0; }
         return neg;
     }
 }
@@ -276,6 +300,11 @@ export async function trainBehavioralModel(enrollmentFeatures, epochs = 40) {
 
 export async function retrainBehavioralModel(model, successfulFeatures, historicalFeatures = [], epochs = 20) {
     if (!model) return null;
+    model.compile({
+        optimizer: tf.train.adam(0.001),
+        loss: 'binaryCrossentropy',
+        metrics: ['accuracy']
+    });
     const corpus = [...historicalFeatures, successfulFeatures].filter(Boolean);
     if (!corpus.length) return model;
     await fitModel(model, corpus, epochs);

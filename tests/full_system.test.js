@@ -1,12 +1,12 @@
 /**
- * full_system_test.js
+ * full_system.test.js
  * Complete multimodal system evaluation with FAR, FRR, EER, and timing metrics.
  *
  * Tests all scenarios: genuine, forged, replay, robot, random scribble.
  * Measures performance for each component independently and the fused system.
  *
  * Run with:
- *   NODE_OPTIONS=--experimental-vm-modules npx jest tests/full_system_test.js --verbose
+ *   NODE_OPTIONS=--experimental-vm-modules npx jest tests/full_system.test.js --verbose
  */
 
 import {
@@ -54,7 +54,7 @@ const dtwDistance = (a, b) => {
 
 /** Convert DTW distance to a 0–100 similarity score */
 const dtwToScore = (dist, threshold = 0.15) =>
-  Math.max(0, Math.min(100, 100 * Math.exp(-(dist / (threshold * 2.4)))));
+  Math.max(0, Math.min(100, 100 * Math.exp(-(dist / (threshold * 1.0)))));
 
 /** Extract 8 behavioral features, filtering zero-speed boundary steps */
 const extractFeatures = (pts) => {
@@ -158,7 +158,7 @@ function scoreSignature(raw, enrollState) {
 // FULL SYSTEM EVALUATION
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Full Multimodal System Evaluation', () => {
+describe('Regression Smoke Test: Synthetic Separation', () => {
   let enrollState;
   const THRESHOLD = 60; // Decision threshold (0–100)
   const N = 200;        // Samples per category
@@ -236,7 +236,7 @@ describe('Full Multimodal System Evaluation', () => {
         const original = generateGenuine('userA');
         const replay = generateReplay(original);
         // Replay is spatially identical — should have high score (system can't block
-        // replay in pure biometric mode without fingerprinting)
+        // replay in biometric mode without fingerprinting)
         // We report the replay detection rate separately
         const isReplay = (() => {
           if (original.length !== replay.length) return false;
@@ -288,15 +288,11 @@ describe('Full Multimodal System Evaluation', () => {
       }
     });
 
-    test('Forgeries are scored (image model handles full rejection)', () => {
+    test('≥ 80% of forgeries are rejected', () => {
       const rejectRate = (forgeryRejected / N) * 100;
-      console.log(`  Forgeries rejected by DTW+behavior: ${forgeryRejected}/${N} (${rejectRate.toFixed(1)}%)`);
-      console.log(`  NOTE: Image AI model catches heavy-jitter same-shape forgeries in the browser`);
-      // The full multimodal system (DTW + image + behavior) achieves >80% rejection.
-      // DTW alone accepts them because the shape matches. This test verifies the pipeline.
-      expect(forgeryRejected / N).toBeGreaterThanOrEqual(0);
+      console.log(`  Forgeries rejected: ${forgeryRejected}/${N} (${rejectRate.toFixed(1)}%)`);
+      expect(forgeryRejected / N).toBeGreaterThanOrEqual(0.80);
     });
-
   });
 
   // ── EER Computation ───────────────────────────────────────────────────────

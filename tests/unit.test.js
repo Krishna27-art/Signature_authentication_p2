@@ -4,6 +4,8 @@
  * Run with: NODE_OPTIONS=--experimental-vm-modules npx jest tests/unit.test.js --verbose
  */
 
+import { getDynamicThreshold } from '../src/lib/score_fusion.js';
+
 import {
   generateGenuine,
   generateImpostor,
@@ -360,4 +362,10 @@ describe('cosineSimilarity()', () => {
     expect(() => cosineSimilarity([0, 0, 0], [1, 2, 3])).not.toThrow();
   });
 
+});
+
+describe('getDynamicThreshold()', () => {
+  test('cold-start threshold is 62', () => {
+    expect(getDynamicThreshold(null)).toBe(62);
+  });
 });
