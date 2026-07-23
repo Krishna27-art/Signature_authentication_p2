@@ -13,23 +13,23 @@ const DEVICE_CALIBRATION_KEY = 'device_calibration';
 export function getDeviceProfile() {
     const profile = {
         // Basic hardware info
-        userAgent: navigator.userAgent,
-        platform: navigator.platform,
-        hardwareConcurrency: navigator.hardwareConcurrency || 2,
-        deviceMemory: navigator.deviceMemory || 4,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'NodeJS',
+        platform: typeof navigator !== 'undefined' ? navigator.platform : 'Node',
+        hardwareConcurrency: typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 2) : 2,
+        deviceMemory: typeof navigator !== 'undefined' ? (navigator.deviceMemory || 4) : 4,
         
         // Touch capabilities
-        touchSupport: 'ontouchstart' in window,
-        maxTouchPoints: navigator.maxTouchPoints || 0,
+        touchSupport: typeof window !== 'undefined' && 'ontouchstart' in window,
+        maxTouchPoints: typeof navigator !== 'undefined' ? (navigator.maxTouchPoints || 0) : 0,
         
         // Screen info
         screen: {
-            width: screen.width,
-            height: screen.height,
-            availWidth: screen.availWidth,
-            availHeight: screen.availHeight,
-            colorDepth: screen.colorDepth,
-            pixelRatio: window.devicePixelRatio || 1
+            width: typeof screen !== 'undefined' ? screen.width : 1920,
+            height: typeof screen !== 'undefined' ? screen.height : 1080,
+            availWidth: typeof screen !== 'undefined' ? screen.availWidth : 1920,
+            availHeight: typeof screen !== 'undefined' ? screen.availHeight : 1080,
+            colorDepth: typeof screen !== 'undefined' ? screen.colorDepth : 24,
+            pixelRatio: typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1
         },
         
         // Pointer capabilities
@@ -52,67 +52,43 @@ export function getDeviceProfile() {
  * Get pointer type (mouse, pen, touch)
  */
 function getPointerType() {
-    if (window.matchMedia('(pointer: fine)').matches) {
-        return 'fine'; // mouse or pen
-    } else if (window.matchMedia('(pointer: coarse)').matches) {
-        return 'coarse'; // touch
+    if (typeof window !== 'undefined' && window.matchMedia) {
+        if (window.matchMedia('(pointer: fine)').matches) {
+            return 'fine';
+        } else if (window.matchMedia('(pointer: coarse)').matches) {
+            return 'coarse';
+        }
     }
-    return 'unknown';
+    return 'fine';
 }
 
-/**
- * Estimate touch sampling rate based on device characteristics
- */
 function estimateSamplingRate() {
-    // Different devices have different touch sampling rates:
-    // - High-end phones/tablets: 120-240Hz
-    // - Mid-range phones: 60-90Hz
-    // - Low-end phones: 30-60Hz
-    // - Desktop mouse: 1000Hz+ (but browser caps at ~60-120Hz)
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const hc = typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 4) : 4;
+    const dm = typeof navigator !== 'undefined' ? (navigator.deviceMemory || 4) : 4;
+    const isMobile = /Mobile|Android|iPhone|iPad/i.test(ua);
+    const isHighEnd = hc >= 8 || dm >= 8;
+    const isLowEnd = hc <= 2 || dm <= 2;
     
-    const isMobile = /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent);
-    const isHighEnd = navigator.hardwareConcurrency >= 8 || navigator.deviceMemory >= 8;
-    const isLowEnd = navigator.hardwareConcurrency <= 2 || navigator.deviceMemory <= 2;
-    
-    if (!isMobile) {
-        return 120; // Desktop mouse typically high rate
-    }
-    
-    if (isHighEnd) {
-        return 120; // High-end mobile
-    } else if (isLowEnd) {
-        return 50; // Low-end mobile
-    }
-    
-    return 60; // Mid-range mobile
+    if (!isMobile) return 120;
+    if (isHighEnd) return 120;
+    if (isLowEnd) return 50;
+    return 60;
 }
 
-/**
- * Check pressure support
- */
 function checkPressureSupport() {
-    // Try to detect pressure support
-    let hasPressure = false;
-    let pressureRange = { min: 0, max: 1 };
-    
-    // Most modern browsers support pressure via PointerEvent
-    if (window.PointerEvent) {
-        hasPressure = true;
-        // Pressure typically ranges from 0 to 1, but some devices may differ
-        pressureRange = { min: 0, max: 1 };
-    }
-    
+    let hasPressure = typeof window !== 'undefined' && !!window.PointerEvent;
     return {
         supported: hasPressure,
-        range: pressureRange,
-        normalized: true // Most browsers normalize to 0-1
+        range: { min: 0, max: 1 },
+        normalized: true
     };
 }
 
-/**
- * Get canvas rendering capabilities
- */
 function getCanvasCapabilities() {
+    if (typeof document === 'undefined') {
+        return { contextType: '2d', alpha: true, antialias: true, willReadFrequently: true };
+    }
     const testCanvas = document.createElement('canvas');
     const ctx = testCanvas.getContext('2d');
     

@@ -5,6 +5,7 @@
  */
 
 import { getDynamicThreshold } from '../src/lib/score_fusion.js';
+import { BDB, enrollSample, verifySample } from '../src/lib/biometrics.js';
 
 import {
   generateGenuine,
@@ -365,7 +366,74 @@ describe('cosineSimilarity()', () => {
 });
 
 describe('getDynamicThreshold()', () => {
-  test('cold-start threshold is 62', () => {
-    expect(getDynamicThreshold(null)).toBe(62);
+  test('cold-start threshold is 68', () => {
+    expect(getDynamicThreshold(null)).toBe(68);
+  });
+});
+
+describe('End-to-End Verification Pipeline (Integration Test)', () => {
+  let state = null;
+
+  function getStrokes(pts) {
+    const strokes = [];
+    let current = [];
+    for (let i = 0; i < pts.length; i++) {
+      if (i > 0 && pts[i].t - pts[i - 1].t > 100) {
+        if (current.length) strokes.push(current);
+        current = [];
+      }
+      current.push(pts[i]);
+    }
+    if (current.length) strokes.push(current);
+    return strokes;
+  }
+
+  beforeAll(async () => {
+    // In-memory BDB mock for Node Jest environment
+    const memStore = new Map();
+    BDB.get = async (k, fb = null) => (memStore.has(k) ? memStore.get(k) : fb);
+    BDB.set = async (k, v) => memStore.set(k, v);
+    BDB.del = async (k) => memStore.delete(k);
+    BDB.init = async () => {};
+  });
+
+  test('enrolls 5 genuine samples of userA successfully', async () => {
+    const partials = [];
+    state = null;
+    let res = null;
+
+    for (let i = 0; i < 5; i++) {
+      const pts = generateGenuine('userA', 2, 1.0, i * 1000);
+      const strokes = getStrokes(pts);
+      res = await enrollSample(pts, state, partials, null, strokes);
+      if (i < 4) {
+        expect(res.progress).toBe(i + 1);
+      } else {
+        expect(res.done).toBe(true);
+        state = res.state;
+      }
+    }
+    expect(state).not.toBeNull();
+    expect(state.anchorSamples.length).toBe(5);
+  });
+
+  test('verifies genuine attempt from userA → PASS', async () => {
+    // 15s after enrollment so preventReplayAttack (5s window) passes
+    const pts = generateGenuine('userA', 2, 1.0, 15000);
+    const strokes = getStrokes(pts);
+    const res = await verifySample(pts, state, null, strokes);
+    expect(res.err).toBeUndefined();
+    expect(res.pass).toBe(true);
+    expect(res.score).toBeGreaterThanOrEqual(res.threshold);
+  });
+
+  test('verifies structurally different signature shape (impostor userB) → REJECTED', async () => {
+    // 30s after enrollment with different shape (userB)
+    const impostorPts = generateGenuine('userB', 2, 1.0, 30000);
+    const strokes = getStrokes(impostorPts);
+    const res = await verifySample(impostorPts, state, null, strokes);
+    expect(res.pass).toBeUndefined();
+    expect(res.fail).toBeDefined();
+    expect(res.fail).toContain('Signature not matched');
   });
 });

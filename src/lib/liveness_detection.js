@@ -421,7 +421,10 @@ function compareSignatures(hash1, hash2) {
  * Helper: Get device hash
  */
 async function getDeviceHash() {
-    const combined = `${navigator.hardwareConcurrency || 2}|${'ontouchstart' in window}|${screen.colorDepth}`;
+    const hasTouch = typeof window !== 'undefined' && 'ontouchstart' in window;
+    const depth = typeof screen !== 'undefined' ? screen.colorDepth : 24;
+    const hc = typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 2) : 2;
+    const combined = `${hc}|${hasTouch}|${depth}`;
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(combined));
     return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 }

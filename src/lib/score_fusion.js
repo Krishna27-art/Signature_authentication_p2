@@ -1,43 +1,38 @@
 /**
- * score_fusion.js — Fixed scoring pipeline with configuration constants
+ * score_fusion.js — Precision scoring pipeline with strict accuracy thresholds
  */
 
 // ── Configuration Constants ──────────────────────────────────────────────────
-export const DTW_SCALE_MULTIPLIER = 3.0;
+export const DTW_SCALE_MULTIPLIER = 1.5; // Steeper exponential decay for clear separation
 export const DTW_MIN_THRESHOLD = 0.08;
 
-// Model Fusion Weights
-// A11 fix: these are RELATIVE weights — weightedAverage() renormalises by the
-// sum of active (non-null) weights at runtime, so they need not sum to 1.0.
-// Previous values summed to 1.10 which was misleading.
-// New values preserve the same ratios and sum to exactly 1.0:
-//   DTW:Siamese:Behavior:Image = 45:40:15:10 → 0.41:0.36:0.14:0.09 (≈ same ratio)
-export const BASE_DTW_WEIGHT      = 0.41;
-export const BASE_SIAMESE_WEIGHT  = 0.36;
-export const BASE_BEHAVIOR_WEIGHT = 0.14;
-export const BASE_IMAGE_WEIGHT    = 0.09;
+// Model Fusion Weights (DTW + Spatial Image model take priority for spatial accuracy)
+export const BASE_DTW_WEIGHT      = 0.55;
+export const BASE_IMAGE_WEIGHT    = 0.25;
+export const BASE_BEHAVIOR_WEIGHT = 0.10;
+export const BASE_SIAMESE_WEIGHT  = 0.10;
 
 // Dynamic Threshold Settings
-export const COLD_START_THRESHOLD = 62;
-export const THRESHOLD_OFFSET = 8;
-export const MIN_DYNAMIC_THRESHOLD = 60;
-export const MAX_DYNAMIC_THRESHOLD = 80;
+export const COLD_START_THRESHOLD = 68;
+export const THRESHOLD_OFFSET = 6;
+export const MIN_DYNAMIC_THRESHOLD = 68;
+export const MAX_DYNAMIC_THRESHOLD = 85;
 
-export const FINE_POINTER_OFFSET = 6;
-export const FINE_MIN_THRESHOLD = 65;
-export const FINE_MAX_THRESHOLD = 85;
+export const FINE_POINTER_OFFSET = 5;
+export const FINE_MIN_THRESHOLD = 72;
+export const FINE_MAX_THRESHOLD = 88;
 
-export const COARSE_POINTER_OFFSET = 10;
-export const COARSE_MIN_THRESHOLD = 55;
-export const COARSE_MAX_THRESHOLD = 75;
+export const COARSE_POINTER_OFFSET = 8;
+export const COARSE_MIN_THRESHOLD = 68;
+export const COARSE_MAX_THRESHOLD = 82;
 
 // PT Distance Normalization Weights & Scales
 export const MAX_VELOCITY_SCALE = 5.0;
-export const PT_DIST_X_WEIGHT = 1.0;
-export const PT_DIST_Y_WEIGHT = 1.0;
+export const PT_DIST_X_WEIGHT = 1.2;
+export const PT_DIST_Y_WEIGHT = 1.2;
 export const PT_DIST_VEL_WEIGHT = 0.3;
 export const PT_DIST_DIR_WEIGHT = 0.2;
-export const PT_DIST_CURV_WEIGHT = 0.1;
+export const PT_DIST_CURV_WEIGHT = 0.15;
 export const PT_DIST_PRESSURE_WEIGHT = 0.15;
 
 /**
@@ -52,9 +47,7 @@ export function standardize(features, stats) {
  * Convert DTW distance → 0–100 similarity score.
  */
 export function dtwDistanceToSimilarity(distance, threshold = 0.12) {
-    // Clamp threshold to a sane range
     const t = Math.max(threshold, DTW_MIN_THRESHOLD);
-    // scale = threshold * DTW_SCALE_MULTIPLIER so bad signatures score lower.
     const scale = t * DTW_SCALE_MULTIPLIER;
     const similarity = 100 * Math.exp(-(distance / scale));
     return Math.max(0, Math.min(100, similarity));
@@ -76,25 +69,20 @@ function weightedAverage(entries) {
 function confidenceAdjustedScore(score) {
     const normalized = clampUnitScore(score);
     if (normalized === null) return null;
-    // Auxiliary models in browser can be noisy.
-    // If the score is uncertain/weak (0.40–0.60), pull it towards neutral (0.70)
-    // so it doesn't artificially crash the robust DTW score.
-    if (normalized >= 0.40 && normalized <= 0.60) return 0.70;
-    // Slight boost to decent scores
-    return Math.min(1, normalized * 1.1);
+    // No artificial 10% inflation — return strict normalized score
+    return normalized;
 }
 
+/**
+ * Mean of nearest distances for robust representation.
+ */
 export function summarizeNearestDistances(distances, take = 3) {
     const clean = distances
         .filter((d) => Number.isFinite(d))
         .sort((a, b) => a - b)
         .slice(0, take);
     if (clean.length === 0) return Infinity;
-    // FIX: use median not mean to avoid one bad sample dominating
-    const mid = Math.floor(clean.length / 2);
-    return clean.length % 2
-        ? clean[mid]
-        : (clean[mid - 1] + clean[mid]) / 2;
+    return clean.reduce((a, b) => a + b, 0) / clean.length;
 }
 
 export function scoreFromDistanceBand(bestDistance, referenceThreshold) {
@@ -105,26 +93,26 @@ export function scoreFromDistanceBand(bestDistance, referenceThreshold) {
 }
 
 /**
- * Fuse DTW, Siamese, behavioral, and image scores.
+ * Fuse DTW, Siamese, behavioral, and spatial image scores.
  */
 export function fuseScores(dtwSim, siameseSim, behaviorSim, imageSim = null) {
     const dtwScore = Math.max(0, Math.min(100, dtwSim)) / 100;
+    const imageScore = imageSim !== null ? Math.max(0, Math.min(100, imageSim)) / 100 : null;
     const siameseScore = confidenceAdjustedScore(siameseSim);
     const behavioralScore = confidenceAdjustedScore(behaviorSim);
-    const imageScore = confidenceAdjustedScore(imageSim);
 
     const activeEntries = [
         { score: dtwScore, weight: BASE_DTW_WEIGHT }
     ];
 
+    if (imageScore !== null) {
+        activeEntries.push({ score: imageScore, weight: BASE_IMAGE_WEIGHT });
+    }
     if (siameseScore !== null) {
         activeEntries.push({ score: siameseScore, weight: BASE_SIAMESE_WEIGHT });
     }
     if (behavioralScore !== null) {
         activeEntries.push({ score: behavioralScore, weight: BASE_BEHAVIOR_WEIGHT });
-    }
-    if (imageScore !== null) {
-        activeEntries.push({ score: imageScore, weight: BASE_IMAGE_WEIGHT });
     }
 
     const fused = weightedAverage(activeEntries);
@@ -145,7 +133,6 @@ export function ptDist(a, b) {
     const dirA = (a.dir || 0) / Math.PI;
     const dirB = (b.dir || 0) / Math.PI;
     let   dd   = dirA - dirB;
-    // Wrap to [-1,1]
     if (dd >  1) dd -= 2;
     if (dd < -1) dd += 2;
     dd = dd ** 2;
@@ -170,7 +157,6 @@ export function ptDist(a, b) {
 
 /**
  * Dynamic threshold — adapts as the user builds a score history.
- * Customizes min/max caps and offsets based on pointer precision (touch vs mouse).
  */
 export function getDynamicThreshold(avgScore, calibration = null) {
     let offset = THRESHOLD_OFFSET;

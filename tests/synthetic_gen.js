@@ -42,15 +42,16 @@ function addTiming(points, baseSpeed = 3, startTime = 0) {
       p.x - points[i - 1].x,
       p.y - points[i - 1].y
     );
-    // Use random float delta (not floored) so uniqueDts count stays high
+    // Pressure: dynamic pressure variation along the stroke
+    const pressure = 0.4 + Math.sin(progress * Math.PI) * 0.4 + gauss(0.05);
     t += Math.max(2, (pixelDist / (baseSpeed * Math.max(0.1, speedMultiplier))));
-    return { x: p.x, y: p.y, t: Math.round(t * 10) / 10 }; // 0.1ms resolution
+    return { x: p.x, y: p.y, p: Math.max(0.1, Math.min(1, pressure)), t: Math.round(t * 10) / 10 }; // 0.1ms resolution
   });
 }
 
 /** Add position jitter to simulate natural hand variation */
 function jitter(points, sigma = 3) {
-  return points.map(p => ({ x: p.x + gauss(sigma), y: p.y + gauss(sigma), t: p.t }));
+  return points.map(p => ({ x: p.x + gauss(sigma), y: p.y + gauss(sigma), p: p.p !== undefined ? p.p : 0.5, t: p.t }));
 }
 
 // ─── Signature Blueprints ────────────────────────────────────────────────────

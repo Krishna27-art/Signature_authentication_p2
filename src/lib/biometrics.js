@@ -152,7 +152,10 @@ export const writeState = async s  => BDB.set("bio_state", s);
 
 // ── Device Fingerprint (informational only, not used for crypto) ──
 export async function getDeviceHash() {
-    const combined = `${navigator.hardwareConcurrency || 2}|${'ontouchstart' in window}|${screen.colorDepth}`;
+    const hasTouch = typeof window !== 'undefined' && 'ontouchstart' in window;
+    const depth = typeof screen !== 'undefined' ? screen.colorDepth : 24;
+    const hc = typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 2) : 2;
+    const combined = `${hc}|${hasTouch}|${depth}`;
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(combined));
     return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
@@ -266,7 +269,7 @@ function extractSequenceFeatures(normPoints) {
 }
 
 // ── Enroll ────────────────────────────────────────────────
-export const ENROLL_N = 3;
+export const ENROLL_N = 5;
 
 export async function enrollSample(pts, state, partials, canvas, strokes) {
     console.log("🛠 [Enroll] Points:", pts.length);
@@ -354,12 +357,10 @@ export async function enrollSample(pts, state, partials, canvas, strokes) {
     const avgDist = pairDistances.reduce((a, b) => a + b, 0) / pairDistances.length;
     const maxDist = Math.max(...pairDistances);
 
-    // threshold = clamp( max(avgDist * 2.5, maxDist * 1.5), 0.12, 0.30 )
-    // Minimum raised to 0.12: touch input naturally varies more than mouse.
-    // A 0.04 minimum was too tight — genuine same-user signatures were failing.
+    // Tightened threshold with 5 enrollment samples: clamp( max(avgDist * 1.8, maxDist * 1.25), 0.065, 0.18 )
     const dtwThreshold = Math.max(
-        Math.min(Math.max(avgDist * 2.5, maxDist * 1.5), 0.30),
-        0.12
+        Math.min(Math.max(avgDist * 1.8, maxDist * 1.25), 0.18),
+        0.065
     );
     console.log(`[Enroll] DTW pairwise avg=${avgDist.toFixed(4)}, max=${maxDist.toFixed(4)}, threshold=${dtwThreshold.toFixed(4)}`);
 
@@ -494,15 +495,16 @@ export async function verifySample(pts, state, canvas, strokes) {
             const currentSeq  = extractSequenceFeatures(norm);
             const enrolledSeq = extractSequenceFeatures(state.anchorSamples[0]);
             const result = await compareSignaturesSiamese(currentSeq, enrolledSeq);
-            // A03 fix: guard against falsy result before accessing .score / .uncertainty
             if (result && typeof result.score === 'number') {
                 const siameseUncertainty = typeof result.uncertainty === 'number' ? result.uncertainty : 0;
-                // Penalize score proportionally to uncertainty (max 10% penalty)
-                const uncertaintyPenalty = siameseUncertainty * 0.1;
-                siameseScore = Math.max(0, result.score - uncertaintyPenalty);
-                console.log(`[Verify] Siamese score=${siameseScore.toFixed(3)} uncertainty=${siameseUncertainty.toFixed(3)}`);
-            } else {
-                console.warn('[Verify] Siamese returned no result — skipping.');
+                // Only use Siamese model if model is confident (uncertainty < 0.35)
+                if (siameseUncertainty < 0.35) {
+                    const uncertaintyPenalty = siameseUncertainty * 0.1;
+                    siameseScore = Math.max(0, result.score - uncertaintyPenalty);
+                    console.log(`[Verify] Siamese score=${siameseScore.toFixed(3)} uncertainty=${siameseUncertainty.toFixed(3)}`);
+                } else {
+                    console.log(`[Verify] Siamese model uncertainty too high (${siameseUncertainty.toFixed(3)}) — skipping.`);
+                }
             }
         } catch (e) {
             console.warn('[Verify] Siamese model failed — skipping:', e.message);
@@ -518,10 +520,7 @@ export async function verifySample(pts, state, canvas, strokes) {
             const stdFeatures = standardize(rawFeatures, state.behavioralStats);
             const cancelableResult = verifyCancelableTemplate(stdFeatures, state.protectedTemplate);
             if (cancelableResult) cancelableScore = cancelableResult.similarity;
-            console.log(`[Verify] Cancelable similarity: ${cancelableScore?.toFixed(3)}`);
-            if (cancelableResult && !cancelableResult.verified) {
-                console.log("[Verify] Cancelable Hash Mismatch - Possible intrusion.");
-            }
+            console.log(`[Verify] Cancelable template similarity: ${cancelableScore?.toFixed(3)} (verified: ${cancelableResult?.verified})`);
         } catch (e) {
             console.warn("[Verify] Cancelable verification failed:", e.message);
         }
@@ -531,6 +530,12 @@ export async function verifySample(pts, state, canvas, strokes) {
     const rawFused = fuseScores(dtwSimilarity, siameseScore, cancelableScore, imageScore);
     const final    = Math.max(0, rawFused - strokePenalty);
     const threshold = getDynamicThreshold(state.avgScore, calibration);
+
+    // Hard DTW Gate: if DTW distance is larger than 0.90x of threshold or similarity < 60%, fail
+    const dtwGateFailed = dtwFinal > (state.threshold * 0.90) || dtwSimilarity < 60;
+    if (dtwGateFailed) {
+        console.warn(`[Verify] 🚫 Hard DTW Gate triggered: dtwFinal=${dtwFinal.toFixed(4)} > cutoff ${(state.threshold * 0.90).toFixed(4)} or dtwSim=${dtwSimilarity.toFixed(1)} < 60`);
+    }
 
     // ── Session anomaly detection
     // Flag sharp deviations from the user's baseline that may indicate session hijack
@@ -546,15 +551,17 @@ export async function verifySample(pts, state, canvas, strokes) {
         console.warn('[Verify] ⚠️ Session anomaly detected — score dropped sharply from historical baseline.');
     }
 
-    console.log(`[Verify] DTW=${dtwSimilarity.toFixed(1)} Image=${imageScore?.toFixed(1) ?? 'N/A'} Siamese=${siameseScore?.toFixed(3) ?? 'N/A'} Fused=${rawFused.toFixed(1)} penalty=${strokePenalty} final=${final.toFixed(1)} threshold=${threshold.toFixed(1)} anomaly=${sessionAnomaly}`);
-    console.log(`[Verify] Result: ${final >= threshold && !sessionAnomaly ? 'PASS ✅' : 'FAIL ❌'}`);
+    const isPassed = final >= threshold && !sessionAnomaly && !dtwGateFailed;
+
+    console.log(`[Verify] DTW=${dtwSimilarity.toFixed(1)} Image=${imageScore?.toFixed(1) ?? 'N/A'} Siamese=${siameseScore?.toFixed(3) ?? 'N/A'} Fused=${rawFused.toFixed(1)} penalty=${strokePenalty} final=${final.toFixed(1)} threshold=${threshold.toFixed(1)} anomaly=${sessionAnomaly} dtwGateFailed=${dtwGateFailed}`);
+    console.log(`[Verify] Result: ${isPassed ? 'PASS ✅' : 'FAIL ❌'}`);
 
     // Track for FAR/FRR analytics
     const verificationHistory = [...(state.verificationHistory || []),
-        { score: final, passed: final >= threshold, ts: Date.now() }
+        { score: final, passed: isPassed, ts: Date.now() }
     ].slice(-50); // keep last 50
 
-    if (final >= threshold && !sessionAnomaly) {
+    if (isPassed) {
         const currentBehaviorFeat = extractBehavioralFeatures(pts, strokes || [pts]);
         const stdCurrentFeat = state.behavioralStats
             ? standardize(currentBehaviorFeat, state.behavioralStats)
@@ -571,8 +578,6 @@ export async function verifySample(pts, state, canvas, strokes) {
         if (!state.adaptSamples) state.adaptSamples = [];
         if (state.adaptSamples.length >= 10) state.adaptSamples.shift();
         state.adaptSamples.push(norm);
-
-
 
         const explanation = getVerificationExplanation(state.anchorSamples[0], norm, final, threshold);
         await writeState(state);
