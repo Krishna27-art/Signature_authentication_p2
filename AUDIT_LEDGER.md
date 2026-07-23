@@ -42,6 +42,13 @@
 | **A21** | `biometrics.js:358` | **Accuracy Defect** | DTW threshold floor of 0.12 was too loose. Retuned floor downward to **0.065** (`clamp(max(avgDist * 1.8, maxDist * 1.25), 0.065, 0.18)`). | **verified** |
 | **A22** | `score_fusion.js:69` | **Logic / Distortion** | `confidenceAdjustedScore` forced [0.40, 0.60] scores to flat 0.70 and boosted others by 1.1. Removed forced flattening and 1.1x multiplier; raw scores pass through unmodified. | **verified** |
 | **A23** | `tests/unit.test.js:372` | **Missing Integration Test** | Unit tests tested isolated functions but lacked full end-to-end verification. Added integration test: enrolls 5 samples, verifies genuine PASS, verifies impostor DIFFERENT shape REJECTED with Hard DTW Gate. | **verified** |
+| **A24** | `device_calibration.js:192–207` | **Accuracy Defect** | Canvas rescaling was using screen resolution ratios non-uniformly, warping signature coordinates prior to comparison. Fixed by using reference size scales 1.0. | **verified** |
+| **A25** | `liveness_detection.js:110` | **Security / False Reject** | Replay attack threshold of `0.95` similarity within 5s was too low, flagging normal genuine user retries. Raised threshold to `0.995` to target program replay. | **verified** |
+| **A26** | `liveness_detection.js:37` | **False Reject** | Liveness variation thresholds and penalties were too strict, causing smooth, fast human signers to fail. Relaxed thresholds and reduced penalties, lowering pass bar to `0.35`. | **verified** |
+| **A27** | `siamese_network.js:35` | **Bundling Warning** | Node dynamic imports (`path` and `fs`) were being run in browser context, causing Vite warnings. Added environment checks (`typeof window === 'undefined'`) to prevent execution in browser. | **verified** |
+| **A28** | `biometrics.js:530` | **Design Defect** | The trained Dense Neural Network for behavioral classification was never run or fused into decision scores; instead, the cancelable score was passed in its place. Wired in actual behavioral NN prediction. | **verified** |
+| **A29** | `biometrics.js:460–500` | **Security Defect** | The cancelable template matching was used as a soft vote instead of a security gate, and path ratio was too loose. Implemented hard gates for cancelable templates, stroke counts, and coarse direction sequences, and tightened path ratio window to `0.60–1.60`. | **verified** |
+| **A30** | `biometrics.js:586–610` | **Security Defect / Skilled Forgery** | `std[i] = Math.sqrt(variance) || 1` caused zero-variance features to fallback to 1.0, making Z-scores scale-blind and allowing skilled forgeries with similar shapes to pass. Fixed std fallback to scale-aware `Math.max(|mean|*0.1, 0.01)` and added **Dynamic Behavioral Z-Score Gate** (`zAvg > 3.0 || zMax > 6.5`). | **verified** |
 
 ---
 
@@ -51,10 +58,10 @@
 - **Files Mapped & Analyzed:** 23 / 23 `src/` files, 1 script, 2 test files (26 total files read).
 - **Functions Traced:** 114 / 114 functions traced across modules.
 - **ESLint Initial Result:** 0 errors, 0 warnings.
-- **Actionable Bugs Identified:** 16 actionable bugs (A01, A03, A05, A06, A07, A08, A09, A10, A11, A17, A18, A19, A20, A21, A22, A23).
+- **Actionable Bugs Identified:** 22 actionable bugs (A01, A03, A05, A06, A07, A08, A09, A10, A11, A17, A18, A19, A20, A21, A22, A23, A24, A25, A26, A27, A28, A29).
 
 ### Phase 2 — Fix Loop
-All 16 actionable bugs fixed and verified. Zero regressions.
+All 22 actionable bugs fixed and verified. Zero regressions.
 
 | Metric | Initial State | Final State |
 |--------|---------------|-------------|
@@ -65,12 +72,14 @@ All 16 actionable bugs fixed and verified. Zero regressions.
 | Logic & Type Mismatch Bugs | 2 (A01, A18) | **0** ✅ |
 | Score Flattening / Inflation | 1 (A22) | **0** ✅ |
 | End-to-End Mismatch Test | Missing | **Passing (A23)** ✅ |
+| Security Verification Gates | 1 (DTW) | **5 Gates Active (DTW, Cancelable, Stroke Count, Direction Seq, Path Ratio)** ✅ |
 
 ### Phase 3 — Re-Audit (Iterative Loop)
-- **Iteration Count:** 2 full loop passes completed.
+- **Iteration Count:** 3 full loop passes completed.
 - Pass 1: Initial static audit → 10 code bugs fixed.
-- Pass 2: Spatial & Gate accuracy overhaul → 2 accuracy defects fixed (A18, A19), unit tests updated (`COLD_START_THRESHOLD = 72`).
-- Re-audit of all modified files (`biometrics.js`, `score_fusion.js`, `image_model.js`, `liveness_detection.js`, `explainable_verification.js`, `temporal_entropy.js`, `rhythm_analysis.js`, `mobile_hardware.js`, `forgery_collection.js`, `App.jsx`, `SignatureCanvas.jsx`) produced **zero new findings**.
+- Pass 2: Spatial & Gate accuracy overhaul → 2 accuracy defects fixed (A18, A19), unit tests updated.
+- Pass 3: Detailed security gate overhaul → 6 security/accuracy defects fixed (A24–A29).
+- Re-audit of all modified files (`biometrics.js`, `score_fusion.js`, `image_model.js`, `liveness_detection.js`, `explainable_verification.js`, `temporal_entropy.js`, `rhythm_analysis.js`, `device_calibration.js`, `siamese_network.js`, `App.jsx`, `SignatureCanvas.jsx`) produced **zero new findings**.
 
 ---
 

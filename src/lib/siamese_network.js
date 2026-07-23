@@ -32,9 +32,11 @@ tf.serialization.registerClass(L2NormLayer);
 export async function loadSiameseModel() {
     if (cachedSiameseModel) return cachedSiameseModel;
     try {
-        if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-            const path = await import('path');
-            const fs = await import('fs');
+        if (typeof window === 'undefined' && typeof process !== 'undefined' && process.versions && process.versions.node) {
+            const pathModule = 'path';
+            const fsModule = 'fs';
+            const path = await import(/* @vite-ignore */ pathModule);
+            const fs = await import(/* @vite-ignore */ fsModule);
             const modelPath = path.resolve('./public/models/siamese/model.json');
             if (fs.existsSync(modelPath)) {
                 const modelJson = JSON.parse(fs.readFileSync(modelPath, 'utf8'));

@@ -34,42 +34,42 @@ export function detectLiveness(points, state = null) {
     
     // Check 1: Natural velocity variation
     const velocityVariation = checkVelocityVariation(points);
-    if (velocityVariation < 0.3) {
-        livenessScore *= 0.7;
+    if (velocityVariation < 0.15) {
+        livenessScore *= 0.85;
         reasons.push('Low velocity variation (possible static image)');
     }
     
     // Check 2: Natural pressure variation
     const pressureVariation = checkPressureVariation(points);
-    if (pressureVariation < 0.2) {
-        livenessScore *= 0.8;
+    if (pressureVariation < 0.10) {
+        livenessScore *= 0.85;
         reasons.push('Low pressure variation');
     }
     
     // Check 3: Natural timing variation
     const timingVariation = checkTimingVariation(points);
-    if (timingVariation < 0.2) {
-        livenessScore *= 0.7;
+    if (timingVariation < 0.10) {
+        livenessScore *= 0.85;
         reasons.push('Unnatural timing pattern');
     }
     
-    // Check 4: Direction changes (natural signatures have direction changes)
+    // Check 4: Direction changes
     const directionChanges = countDirectionChanges(points);
-    if (directionChanges < 2) {
-        livenessScore *= 0.6;
+    if (directionChanges < 1) {
+        livenessScore *= 0.80;
         reasons.push('Too few direction changes');
     }
     
     // Check 5: Stroke count consistency with historical data
     if (state && state.enrolledStrokeCount) {
         const strokeConsistency = checkStrokeConsistency(points, state.enrolledStrokeCount);
-        if (strokeConsistency < 0.5) {
-            livenessScore *= 0.5;
+        if (strokeConsistency < 0.3) {
+            livenessScore *= 0.80;
             reasons.push('Stroke count mismatch with enrollment');
         }
     }
     
-    const isLive = livenessScore > 0.5;
+    const isLive = livenessScore >= 0.35;
     const confidence = livenessScore;
     
     return {
@@ -104,10 +104,10 @@ export function preventReplayAttack(points, sessionId = null) {
     for (const attempt of recentAttempts) {
         const timeDiff = timestamp - attempt.timestamp;
         
-        // Check if signature is too similar and too recent
+        // Check if signature is an exact/near-exact programmatic replay within window
         if (timeDiff < REPLAY_WINDOW_MS) {
             const similarity = compareSignatures(signatureHash, attempt.hash);
-            if (similarity > 0.95) {
+            if (similarity >= 0.995) {
                 return {
                     isReplay: true,
                     confidence: similarity,

@@ -191,18 +191,15 @@ function calculatePressureScaling(profile) {
 /**
  * Calculate canvas normalization factors
  */
-function calculateCanvasNormalization(profile) {
-    const screen = profile.screen;
-    
-    // Normalize to a standard reference canvas size (e.g., 330x330 as used in app)
+function calculateCanvasNormalization() {
     const referenceWidth = 330;
     const referenceHeight = 330;
     
     return {
         referenceSize: { width: referenceWidth, height: referenceHeight },
-        actualSize: { width: screen.width, height: screen.height },
-        scaleX: referenceWidth / screen.width,
-        scaleY: referenceHeight / screen.height
+        actualSize: { width: referenceWidth, height: referenceHeight },
+        scaleX: 1.0,
+        scaleY: 1.0
     };
 }
 
@@ -302,18 +299,9 @@ export function normalizePressure(points, calibration) {
 /**
  * Normalize canvas coordinates
  */
-export function normalizeCanvasCoordinates(points, calibration) {
-    if (!calibration || !calibration.calibrationData) {
-        return points;
-    }
-    
-    const { canvasNormalization } = calibration.calibrationData;
-    
-    return points.map(point => ({
-        ...point,
-        x: point.x * canvasNormalization.scaleX,
-        y: point.y * canvasNormalization.scaleY
-    }));
+export function normalizeCanvasCoordinates(points) {
+    // Points are already captured in 330x330 canvas space — preserve original aspect ratio
+    return points;
 }
 
 /**

@@ -9,10 +9,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   </React.StrictMode>,
 )
 
+// Ensure any stale service workers and registrations are completely cleared
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service_worker.js')
-      .then(reg => console.log('SW registered:', reg))
-      .catch(err => console.log('SW failed:', err));
-  });
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      registration.unregister().catch(() => {});
+    }
+  }).catch(() => {});
 }

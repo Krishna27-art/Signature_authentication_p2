@@ -22,7 +22,7 @@ import { getSignatureEmbedding, cosineSimilarity, normalizeCosineScore } from '.
 import { extractBehavioralFeatures } from './behavioral_model';
 import { fuseScores, dtwDistanceToSimilarity, ptDist, getDynamicThreshold, standardize, summarizeNearestDistances } from './score_fusion';
 import { fastDTW } from './enhanced_dtw';
-import { loadSiameseModel, compareSignaturesSiamese } from './siamese_network';
+import { loadSiameseModel, compareSignaturesSiamese, getSignatureEmbeddingVector } from './siamese_network';
 import { detectLiveness, preventReplayAttack } from './liveness_detection';
 import { protectTemplate, verifyCancelableTemplate } from './cancelable_biometrics';
 import { initDeviceCalibration, getDeviceCalibration, applyDeviceNormalization } from './device_calibration';
@@ -340,7 +340,7 @@ export async function enrollSample(pts, state, partials, canvas, strokes) {
         const vals = behaviorFeatures.map(f => f[i]);
         mean[i] = vals.reduce((a, b) => a + b, 0) / vals.length;
         const variance = vals.reduce((s, v) => s + (v - mean[i]) ** 2, 0) / vals.length;
-        std[i] = Math.sqrt(variance) || 1; // avoid div-by-zero
+        std[i] = Math.sqrt(variance) || Math.max(Math.abs(mean[i]) * 0.1, 0.01);
     }
     const standardizedFeatures = behaviorFeatures.map(f => standardize(f, { mean, std }));
     
@@ -378,6 +378,29 @@ export async function enrollSample(pts, state, partials, canvas, strokes) {
     // 7. Cancelable Biometrics (BioHashing) for behavioral stats
     const protectedTemplate = await protectTemplate(mean, await getDeviceHash());
 
+    // 8. Generate behavioral prototype using Siamese BiLSTM embedding extractor
+    let behavioralPrototype = null;
+    let behavioralTrained = false;
+    try {
+        const enrollEmbeddings = [];
+        for (const sample of partials) {
+            const seq = extractSequenceFeatures(sample);
+            const emb = await getSignatureEmbeddingVector(seq);
+            if (emb) enrollEmbeddings.push(emb);
+        }
+        if (enrollEmbeddings.length > 0) {
+            behavioralPrototype = new Array(enrollEmbeddings[0].length).fill(0);
+            enrollEmbeddings.forEach(e => e.forEach((v, i) => behavioralPrototype[i] += v / enrollEmbeddings.length));
+            // Normalize prototype to unit sphere
+            const mag = Math.sqrt(behavioralPrototype.reduce((s, v) => s + v * v, 0)) || 1;
+            behavioralPrototype = behavioralPrototype.map(v => v / mag);
+            behavioralTrained = true;
+            console.log("[Enroll] Behavioral prototype generated and L2 normalized successfully.");
+        }
+    } catch (err) {
+        console.warn("[Enroll] Failed to extract behavioral prototype:", err.message);
+    }
+
     const ns = DEFAULT_STATE();
     // A10 fix: ns.template was a dead assignment — verifySample only reads anchorSamples.
     // Kept for backwards DB compat but no longer used in verification logic.
@@ -385,7 +408,8 @@ export async function enrollSample(pts, state, partials, canvas, strokes) {
     ns.anchorSamples         = [...partials];
     ns.threshold             = dtwThreshold;
     ns.imageEmbedding        = avgEmb;
-    ns.behavioralTrained     = false;
+    ns.behavioralTrained     = behavioralTrained;
+    ns.behavioralPrototype   = behavioralPrototype;
     ns.siameseTrained        = siameseTrained;
     ns.behavioralStats       = { mean, std };
     ns.protectedTemplate     = protectedTemplate;
@@ -414,12 +438,12 @@ export async function verifySample(pts, state, canvas, strokes) {
     // Anti-Spoofing & Liveness
     const replayCheck = preventReplayAttack(pts);
     if (replayCheck.isReplay) {
-        return { err: `Replay Attack Detected (${Math.round(replayCheck.confidence * 100)}% Match).` };
+        return { fail: `Signature not matched.` };
     }
 
     const livenessCheck = detectLiveness(pts, state);
     if (!livenessCheck.isLive) {
-        return { err: `Liveness Failed: ${livenessCheck.reasons.join(', ')}` };
+        return { fail: `Signature not matched.` };
     }
 
     // Initialize device calibration if not already done
@@ -433,34 +457,49 @@ export async function verifySample(pts, state, canvas, strokes) {
     }
 
     const norm = normalize(normalizedPts, 64);
-    if (!norm) return { err: "Signature too short or too small." };
+    if (!norm) return { fail: "Signature not matched." };
 
     // ── Path length check (half-signature detection)
     if (state.enrolledPathLength != null) {
         const currentLen = rawPathLen(norm);
         const ratio = currentLen / state.enrolledPathLength;
 
-        // DEPLOYMENT FIX: ratio window widened to 0.30–3.0.
+        // Tightened path length corridor
         const stdBuffer = state.enrolledPathLengthStd
-            ? (state.enrolledPathLengthStd / state.enrolledPathLength) * 3
-            : 0.4;
-        const minRatio = Math.max(0.25, 0.50 - stdBuffer);
-        const maxRatio = Math.min(4.0,  2.00 + stdBuffer);
+            ? (state.enrolledPathLengthStd / state.enrolledPathLength) * 2.0
+            : 0.25;
+        const minRatio = Math.max(0.60, 0.70 - stdBuffer);
+        const maxRatio = Math.min(1.60, 1.30 + stdBuffer);
 
         console.log(`[Verify] Path ratio: ${ratio.toFixed(2)} (allowed: ${minRatio.toFixed(2)}–${maxRatio.toFixed(2)})`);
 
         if (ratio < minRatio || ratio > maxRatio) {
-            return { err: `Signature size mismatch (${Math.round(ratio * 100)}% of enrolled). Draw your full signature.` };
+            return { fail: `Signature not matched.` };
         }
     }
 
-    // ── Stroke count soft penalty
+    // ── Stroke count soft penalty and hard gate
     const currentStrokeCount = strokes ? strokes.length : 1;
     let strokePenalty = 0;
+    let strokeGateFailed = false;
     if (state.enrolledStrokeCount != null) {
         const diff = Math.abs(currentStrokeCount - state.enrolledStrokeCount);
-        strokePenalty = diff * 1; // Reduced from 3 to 1 point per extra/missing stroke
-        if (diff > 0) console.log(`[Verify] Stroke diff: ${diff} → penalty ${strokePenalty}`);
+        strokePenalty = diff * 1; // 1 point per extra/missing stroke
+        if (diff > 1) {
+            strokeGateFailed = true;
+            console.warn(`[Verify] 🚫 Stroke count gate failed: current=${currentStrokeCount}, enrolled=${state.enrolledStrokeCount}`);
+        } else if (diff > 0) {
+            console.log(`[Verify] Stroke diff: ${diff} → penalty ${strokePenalty}`);
+        }
+    }
+
+    // ── Coarse Direction Sequence check
+    const currentDirs = getCoarseDirections(norm);
+    const enrolledDirs = getCoarseDirections(state.anchorSamples[0]);
+    const dirSim = compareDirectionSequences(currentDirs, enrolledDirs);
+    const dirSequenceGateFailed = dirSim < 0.40;
+    if (dirSequenceGateFailed) {
+        console.warn(`[Verify] 🚫 Coarse direction sequence gate failed: similarity=${dirSim.toFixed(3)} < 0.40`);
     }
 
     // ── DTW ───────────────────────────────────────────────
@@ -482,7 +521,6 @@ export async function verifySample(pts, state, canvas, strokes) {
                 console.log(`[Verify] Image score: ${imageScore?.toFixed(3)}`);
             }
         } catch (e) {
-            // Image model failure must not affect verification result
             console.warn("[Verify] Image model failed — skipping:", e.message);
             imageScore = null;
         }
@@ -497,7 +535,6 @@ export async function verifySample(pts, state, canvas, strokes) {
             const result = await compareSignaturesSiamese(currentSeq, enrolledSeq);
             if (result && typeof result.score === 'number') {
                 const siameseUncertainty = typeof result.uncertainty === 'number' ? result.uncertainty : 0;
-                // Only use Siamese model if model is confident (uncertainty < 0.35)
                 if (siameseUncertainty < 0.35) {
                     const uncertaintyPenalty = siameseUncertainty * 0.1;
                     siameseScore = Math.max(0, result.score - uncertaintyPenalty);
@@ -512,22 +549,70 @@ export async function verifySample(pts, state, canvas, strokes) {
         }
     }
 
-    // ── Cancelable Biometrics verification ───────────
+    // ── Behavioral Prototype Similarity Model ─────────────────────────
+    let behavioralScore = null;
+    if (state.behavioralTrained && state.behavioralPrototype) {
+        try {
+            const currentSeq = extractSequenceFeatures(norm);
+            const currentEmb = await getSignatureEmbeddingVector(currentSeq);
+            if (currentEmb) {
+                const sim = cosineSimilarity(state.behavioralPrototype, currentEmb);
+                // Convert [-1, 1] cosine similarity to [0, 100] percentage score
+                behavioralScore = normalizeCosineScore(sim);
+                console.log(`[Verify] Behavioral prototype similarity: ${behavioralScore?.toFixed(1)}%`);
+            }
+        } catch (e) {
+            console.warn("[Verify] Behavioral prototype similarity calculation failed:", e.message);
+        }
+    }
+
+    // ── Cancelable Biometrics verification (Hard Gated Security Check) ───────────
     let cancelableScore = null;
+    let cancelableGateFailed = false;
     if (state.protectedTemplate && state.behavioralStats) {
         try {
             const rawFeatures = extractBehavioralFeatures(pts, strokes || [pts]);
             const stdFeatures = standardize(rawFeatures, state.behavioralStats);
             const cancelableResult = verifyCancelableTemplate(stdFeatures, state.protectedTemplate);
-            if (cancelableResult) cancelableScore = cancelableResult.similarity;
+            if (cancelableResult) {
+                cancelableScore = cancelableResult.similarity;
+                if (!cancelableResult.verified && cancelableScore < 0.48) {
+                    cancelableGateFailed = true;
+                }
+            }
             console.log(`[Verify] Cancelable template similarity: ${cancelableScore?.toFixed(3)} (verified: ${cancelableResult?.verified})`);
         } catch (e) {
             console.warn("[Verify] Cancelable verification failed:", e.message);
         }
     }
 
+    // ── Dynamic Behavioral Z-Score Gate (Skilled Forgery Protection) ─────────────
+    let zScoreGateFailed = false;
+    let behavioralZScore = null;
+    if (state.behavioralStats && state.behavioralStats.mean && state.behavioralStats.std) {
+        try {
+            const rawFeatures = extractBehavioralFeatures(pts, strokes || [pts]);
+            const stdFeatures = standardize(rawFeatures, state.behavioralStats);
+            const absZ = stdFeatures.map(z => Math.abs(z));
+            const zAvg = absZ.reduce((s, z) => s + z, 0) / absZ.length;
+            const zMax = Math.max(...absZ);
+
+            behavioralZScore = Math.max(0, Math.min(100, (1 - (zAvg / 3.0)) * 100));
+
+            // Hard Gate: if average Z-score deviation exceeds 3.0 standard deviations, reject
+            if (zAvg > 3.0 || zMax > 6.5) {
+                zScoreGateFailed = true;
+                console.warn(`[Verify] 🚫 Dynamic Behavioral Z-Score Gate failed: avgZ=${zAvg.toFixed(2)}, maxZ=${zMax.toFixed(2)}`);
+            } else {
+                console.log(`[Verify] Dynamic Behavioral Z-Score: avgZ=${zAvg.toFixed(2)}, maxZ=${zMax.toFixed(2)}, score=${behavioralZScore.toFixed(1)}%`);
+            }
+        } catch (e) {
+            console.warn("[Verify] Dynamic behavioral Z-score calculation failed:", e.message);
+        }
+    }
+
     // ── Fuse & decide ─────────────────────────────────────────────────────────
-    const rawFused = fuseScores(dtwSimilarity, siameseScore, cancelableScore, imageScore);
+    const rawFused = fuseScores(dtwSimilarity, siameseScore, behavioralScore ?? behavioralZScore, imageScore);
     const final    = Math.max(0, rawFused - strokePenalty);
     const threshold = getDynamicThreshold(state.avgScore, calibration);
 
@@ -538,22 +623,21 @@ export async function verifySample(pts, state, canvas, strokes) {
     }
 
     // ── Session anomaly detection
-    // Flag sharp deviations from the user's baseline that may indicate session hijack
     const sessionAnomaly = (() => {
         const hist = state.verificationHistory || [];
         const recent = hist.filter(h => h.passed).slice(-10);
         if (recent.length < 5) return false;
         const avgPastScore = recent.reduce((s, h) => s + h.score, 0) / recent.length;
         const drop = avgPastScore - final;
-        return drop > 35; // Increased from 25 to 35 to reduce false positives
+        return drop > 35;
     })();
     if (sessionAnomaly) {
         console.warn('[Verify] ⚠️ Session anomaly detected — score dropped sharply from historical baseline.');
     }
 
-    const isPassed = final >= threshold && !sessionAnomaly && !dtwGateFailed;
+    const isPassed = final >= threshold && !sessionAnomaly && !dtwGateFailed && !cancelableGateFailed && !strokeGateFailed && !dirSequenceGateFailed && !zScoreGateFailed;
 
-    console.log(`[Verify] DTW=${dtwSimilarity.toFixed(1)} Image=${imageScore?.toFixed(1) ?? 'N/A'} Siamese=${siameseScore?.toFixed(3) ?? 'N/A'} Fused=${rawFused.toFixed(1)} penalty=${strokePenalty} final=${final.toFixed(1)} threshold=${threshold.toFixed(1)} anomaly=${sessionAnomaly} dtwGateFailed=${dtwGateFailed}`);
+    console.log(`[Verify] DTW=${dtwSimilarity.toFixed(1)} Image=${imageScore?.toFixed(1) ?? 'N/A'} Siamese=${siameseScore?.toFixed(3) ?? 'N/A'} BehavioralNN=${behavioralScore?.toFixed(3) ?? behavioralZScore?.toFixed(3) ?? 'N/A'} Fused=${rawFused.toFixed(1)} penalty=${strokePenalty} final=${final.toFixed(1)} threshold=${threshold.toFixed(1)} anomaly=${sessionAnomaly} dtwGateFailed=${dtwGateFailed} cancelableGateFailed=${cancelableGateFailed} strokeGateFailed=${strokeGateFailed} dirGateFailed=${dirSequenceGateFailed} zScoreGateFailed=${zScoreGateFailed}`);
     console.log(`[Verify] Result: ${isPassed ? 'PASS ✅' : 'FAIL ❌'}`);
 
     // Track for FAR/FRR analytics
@@ -562,6 +646,23 @@ export async function verifySample(pts, state, canvas, strokes) {
     ].slice(-50); // keep last 50
 
     if (isPassed) {
+        // High confidence prototype update (prevent template poisoning by requiring score >= 80.0)
+        if (final >= 80.0) {
+            try {
+                const currentSeq = extractSequenceFeatures(norm);
+                const currentEmb = await getSignatureEmbeddingVector(currentSeq);
+                if (currentEmb && state.behavioralPrototype) {
+                    const alpha = 0.1;
+                    const updated = state.behavioralPrototype.map((v, i) => (1 - alpha) * v + alpha * currentEmb[i]);
+                    const mag = Math.sqrt(updated.reduce((s, v) => s + v * v, 0)) || 1;
+                    state.behavioralPrototype = updated.map(v => v / mag);
+                    console.log("[Verify] Behavioral prototype updated with alpha=0.1.");
+                }
+            } catch (e) {
+                console.warn("[Verify] Failed to update behavioral prototype:", e.message);
+            }
+        }
+
         const currentBehaviorFeat = extractBehavioralFeatures(pts, strokes || [pts]);
         const stdCurrentFeat = state.behavioralStats
             ? standardize(currentBehaviorFeat, state.behavioralStats)
@@ -588,4 +689,28 @@ export async function verifySample(pts, state, canvas, strokes) {
         await writeState(state);
         return { fail: "Signature not matched.", score: final, threshold, attempts: state.attempts, explanation };
     }
+}
+
+function getCoarseDirections(path) {
+    const steps = [8, 16, 24, 32, 40, 48, 56, 63];
+    const dirs = [];
+    for (let i = 1; i < steps.length; i++) {
+        const p1 = path[steps[i - 1]];
+        const p2 = path[steps[i]];
+        if (p1 && p2) {
+            dirs.push(Math.atan2(p2.y - p1.y, p2.x - p1.x));
+        }
+    }
+    return dirs;
+}
+
+function compareDirectionSequences(dirs1, dirs2) {
+    let sumSim = 0;
+    const n = Math.min(dirs1.length, dirs2.length);
+    if (n === 0) return 0;
+    for (let i = 0; i < n; i++) {
+        const diff = dirs1[i] - dirs2[i];
+        sumSim += Math.cos(diff);
+    }
+    return sumSim / n;
 }

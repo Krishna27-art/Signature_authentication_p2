@@ -39,8 +39,12 @@ export const PT_DIST_PRESSURE_WEIGHT = 0.15;
  * Standardize features using stored mean and std.
  */
 export function standardize(features, stats) {
-    if (!stats) return features;
-    return features.map((v, i) => (v - stats.mean[i]) / (stats.std[i] || 1));
+    if (!stats || !stats.mean || !stats.std) return features;
+    return features.map((v, i) => {
+        const m = stats.mean[i] || 0;
+        const s = stats.std[i] || Math.max(Math.abs(m) * 0.1, 0.01);
+        return (v - m) / s;
+    });
 }
 
 /**

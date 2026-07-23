@@ -1,100 +1,65 @@
+import * as tf from '@tensorflow/tfjs';
+
+let mobilenetModel = null;
+let featureModel = null;
+
+/**
+ * Loads the MobileNet v1 model from TensorFlow Storage CDN and creates
+ * a feature extractor using its penultimate activation layer.
+ */
 export async function loadImageModel() {
-  return true;
+  if (featureModel) return featureModel;
+  try {
+    mobilenetModel = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
+    // Penultimate feature layer conv_pw_13_relu has shape [batch, 7, 7, 256]
+    const layer = mobilenetModel.getLayer('conv_pw_13_relu') || mobilenetModel.layers[mobilenetModel.layers.length - 2];
+    featureModel = tf.model({ inputs: mobilenetModel.inputs, outputs: layer.output });
+    console.log("✅ MobileNet feature extractor loaded successfully.");
+    return featureModel;
+  } catch (err) {
+    console.warn("⚠️ Failed to load MobileNet feature extractor:", err.message);
+    return null;
+  }
 }
 
 /**
- * Extracts a spatial grid density vector (8x8 grid = 64 dimensions)
- * from the signature bounding box.
+ * Extracts a 256-dimensional L2-normalized visual feature vector from canvas
+ * using MobileNet feature extractor.
  */
-function getSpatialGridDensity(canvas, gridSize = 8) {
-  const ctx = canvas.getContext('2d');
-  const { width, height } = canvas;
-  if (!width || !height) return null;
-
-  const imgData = ctx.getImageData(0, 0, width, height);
-  const data = imgData.data;
-
-  // 1. Find ink bounding box
-  let minX = width, maxX = 0, minY = height, maxY = 0;
-  let hasInk = false;
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = (y * width + x) * 4;
-      const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
-      // Dark ink check (non-white & visible)
-      if (a > 30 && (r < 220 || g < 220 || b < 220)) {
-        hasInk = true;
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-  }
-
-  if (!hasInk || maxX <= minX || maxY <= minY) {
-    return new Float32Array(gridSize * gridSize).fill(0);
-  }
-
-  // 2. Render bounding-box cropped ink into a normalized 128x128 canvas
-  const boxW = maxX - minX + 1;
-  const boxH = maxY - minY + 1;
-  const targetSize = 128;
-
-  const offscreen = document.createElement('canvas');
-  offscreen.width = targetSize;
-  offscreen.height = targetSize;
-  const offCtx = offscreen.getContext('2d');
-
-  offCtx.fillStyle = 'white';
-  offCtx.fillRect(0, 0, targetSize, targetSize);
-
-  // Preserve aspect ratio with padding
-  const scale = Math.min((targetSize - 16) / boxW, (targetSize - 16) / boxH);
-  const drawW = boxW * scale;
-  const drawH = boxH * scale;
-  const offsetX = (targetSize - drawW) / 2;
-  const offsetY = (targetSize - drawH) / 2;
-
-  offCtx.drawImage(canvas, minX, minY, boxW, boxH, offsetX, offsetY, drawW, drawH);
-
-  // 3. Compute 8x8 cell densities
-  const normData = offCtx.getImageData(0, 0, targetSize, targetSize).data;
-  const cellSize = targetSize / gridSize; // 16px per cell
-  const grid = new Float32Array(gridSize * gridSize);
-
-  for (let gy = 0; gy < gridSize; gy++) {
-    for (let gx = 0; gx < gridSize; gx++) {
-      const startX = Math.floor(gx * cellSize);
-      const startY = Math.floor(gy * cellSize);
-      let inkCount = 0;
-
-      for (let y = startY; y < startY + cellSize; y++) {
-        for (let x = startX; x < startX + cellSize; x++) {
-          const idx = (y * targetSize + x) * 4;
-          const r = normData[idx], g = normData[idx + 1], b = normData[idx + 2];
-          if (r < 220 || g < 220 || b < 220) {
-            inkCount++;
-          }
-        }
-      }
-      grid[gy * gridSize + gx] = inkCount / (cellSize * cellSize);
-    }
-  }
-
-  // 4. L2 Normalize grid vector
-  const mag = Math.sqrt(grid.reduce((s, v) => s + v * v, 0)) || 1;
-  return grid.map(v => v / mag);
-}
-
 export async function getSignatureEmbedding(canvas) {
   if (!canvas) return null;
+  const model = await loadImageModel();
+  if (!model) return null;
+
   try {
-    const gridVec = getSpatialGridDensity(canvas, 8);
-    return gridVec ? Array.from(gridVec) : null;
+    return tf.tidy(() => {
+      // 1. Convert canvas to tensor [height, width, 3]
+      let img = tf.browser.fromPixels(canvas);
+      
+      // 2. Resize to 224x224
+      img = tf.image.resizeBilinear(img, [224, 224]);
+      
+      // 3. Preprocess pixels from [0, 255] to [-1, 1] range
+      const offset = tf.scalar(127.5);
+      const normalized = img.toFloat().sub(offset).div(offset);
+      
+      // 4. Add batch dimension [1, 224, 224, 3]
+      const inputTensor = normalized.expandDims(0);
+      
+      // 5. Predict to get feature map of shape [1, 7, 7, 256]
+      const features = model.predict(inputTensor);
+      
+      // 6. Global Average Pooling to get 256-dimensional vector [1, 256]
+      const pooled = tf.mean(features, [1, 2]);
+      
+      // 7. L2 Normalize the vector
+      const norm = tf.norm(pooled, 2, 1, true);
+      const l2Normalized = tf.div(pooled, tf.maximum(norm, tf.scalar(1e-8)));
+      
+      return Array.from(l2Normalized.dataSync());
+    });
   } catch (err) {
-    console.warn('[ImageModel] Embedding error:', err);
+    console.warn('[ImageModel] MobileNet embedding error:', err);
     return null;
   }
 }

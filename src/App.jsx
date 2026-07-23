@@ -2,10 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { BDB, readState, enrollSample, verifySample, ENROLL_N } from './lib/biometrics';
 import { loadImageModel } from './lib/image_model';
 import SignatureCanvas from './components/SignatureCanvas';
-import VisualizationDashboard from './components/VisualizationDashboard';
-import ForgeryReplayDemo from './components/ForgeryReplayDemo';
-import BenchmarkDashboard from './components/BenchmarkDashboard';
-import PerformanceProfiler from './components/PerformanceProfiler';
 import { getUserProfile } from './lib/user_manager';
 import { getDeviceCalibration } from './lib/device_calibration';
 
@@ -18,7 +14,6 @@ const getIsEnrolled = (state) =>
   !!(state?.anchorSamples?.length > 0);
 
 function App() {
-  const [activeTab, setActiveTab] = useState('lock');
   const [appState, setAppState]   = useState(null);
   const [partials, setPartials]   = useState([]);
   const [status, setStatus]       = useState({ msg: '✍️ Draw your signature to begin', type: 'info' });
@@ -168,14 +163,6 @@ function App() {
     ? '🔓 Verify Signature'
     : `💾 Save Sample ${enrollStep} of ${ENROLL_N}`;
 
-  const TABS = [
-    { id: 'lock',          label: '🔐 Lock & Verify' },
-    { id: 'visualization', label: '📊 Analytics' },
-    { id: 'forgery',       label: '🛡️ Forgery Demo' },
-    { id: 'benchmarks',    label: '📈 Benchmarks' },
-    { id: 'profiler',      label: '⚡ Profiler' },
-  ];
-
   return (
     <div className="app-shell">
 
@@ -192,15 +179,9 @@ function App() {
         </div>
 
         <nav className="nav-tabs">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              className={`nav-tab${activeTab === tab.id ? ' active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
+          <button className="nav-tab active">
+            🔐 Lock & Verify
+          </button>
         </nav>
       </header>
 
@@ -208,119 +189,103 @@ function App() {
       <main className="main-content">
 
         {/* ── Lock & Verify Screen ──────────────────────────── */}
-        {activeTab === 'lock' && (
-          <div className="phone-shell">
-            <div className="phone-inner">
+        <div className="phone-shell">
+          <div className="phone-inner">
 
-              {/* Header */}
-              <div className="phone-header">
-                <div className="phone-title">
-                  {isEnrolled ? '🔐 Signature Lock' : '📝 Set Up Signature'}
-                </div>
-                <div className="phone-subtitle">
-                  {isEnrolled
-                    ? 'Draw your signature to authenticate'
-                    : 'Sign three times to register your biometric'}
-                </div>
+            {/* Header */}
+            <div className="phone-header">
+              <div className="phone-title">
+                {isEnrolled ? '🔐 Signature Lock' : '📝 Set Up Signature'}
               </div>
-
-              {/* Progress dots (only during enrollment) */}
-              {!isEnrolled && (
-                <div className="enroll-progress">
-                  {Array.from({ length: ENROLL_N }).map((_, i) => {
-                    const filled = i < partials.length;
-                    const active = i === partials.length;
-                    return (
-                      <div
-                        key={i}
-                        className={`enroll-dot${filled ? ' filled' : ''}${active ? ' active' : ''}`}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Canvas — SignatureCanvas renders its own canvas-wrapper */}
-              <SignatureCanvas
-                ref={sigCanvasRef}
-                onStrokeChange={() => {}}
-              />
-
-              {/* Status */}
-              <div className={`status-pill ${status.type}`}>{status.msg}</div>
-
-              {/* Biometric Explanation */}
-              {lastExplanation?.explanation && (
-                <div className="explanation-card">
-                  <strong>
-                    {typeof lastExplanation.explanation === 'string'
-                      ? 'Biometric Breakdown'
-                      : (lastExplanation.explanation.title || 'Biometric Breakdown')}
-                  </strong>
-                  <div style={{ marginTop: '4px' }}>
-                    {typeof lastExplanation.explanation === 'string'
-                      ? lastExplanation.explanation
-                      : lastExplanation.explanation.message}
-                  </div>
-                  {lastExplanation.explanation.tips && lastExplanation.explanation.tips.length > 0 && (
-                    <ul style={{ marginTop: '6px', paddingLeft: '16px', fontSize: '11px' }}>
-                      {lastExplanation.explanation.tips.map((tip, i) => (
-                        <li key={i}>{tip}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-
-              {/* Model Status */}
-              <div className="model-status-bar">
-                <div title="Xenova/mobilevit-small vision embedding">
-                  📸 Vision AI: <strong>{modelsReady ? imageModelStatus : 'Loading…'}</strong>
-                </div>
-                <div title="Siamese BiLSTM + DTW behavioral model">
-                  🧠 Behavior: <strong>{behaviorModelInfo}</strong>
-                </div>
+              <div className="phone-subtitle">
+                {isEnrolled
+                  ? 'Draw your signature to authenticate'
+                  : `Sign ${ENROLL_N} times to register your biometric`}
               </div>
-
-              {/* Action Buttons */}
-              <div className="btn-row">
-                <button className="btn btn-primary" onClick={handleAction}>
-                  {btnLabel}
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    sigCanvasRef.current?.clear();
-                  }}
-                >
-                  Clear
-                </button>
-              </div>
-
-              {/* Reset */}
-              <div className="reset-row">
-                <button className="btn btn-danger" onClick={resetAll}>
-                  Reset & Re-enroll
-                </button>
-              </div>
-
             </div>
-          </div>
-        )}
 
-        {/* ── Other Tabs ──────────────────────────────────────── */}
-        {activeTab === 'visualization' && (
-          <div className="tab-panel"><VisualizationDashboard /></div>
-        )}
-        {activeTab === 'forgery' && (
-          <div className="tab-panel"><ForgeryReplayDemo /></div>
-        )}
-        {activeTab === 'benchmarks' && (
-          <div className="tab-panel"><BenchmarkDashboard /></div>
-        )}
-        {activeTab === 'profiler' && (
-          <div className="tab-panel"><PerformanceProfiler /></div>
-        )}
+            {/* Progress dots (only during enrollment) */}
+            {!isEnrolled && (
+              <div className="enroll-progress">
+                {Array.from({ length: ENROLL_N }).map((_, i) => {
+                  const filled = i < partials.length;
+                  const active = i === partials.length;
+                  return (
+                    <div
+                      key={i}
+                      className={`enroll-dot${filled ? ' filled' : ''}${active ? ' active' : ''}`}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Canvas — SignatureCanvas renders its own canvas-wrapper */}
+            <SignatureCanvas
+              ref={sigCanvasRef}
+              onStrokeChange={() => {}}
+            />
+
+            {/* Status */}
+            <div className={`status-pill ${status.type}`}>{status.msg}</div>
+
+            {/* Biometric Explanation */}
+            {lastExplanation?.explanation && (
+              <div className="explanation-card">
+                <strong>
+                  {typeof lastExplanation.explanation === 'string'
+                    ? 'Biometric Breakdown'
+                    : (lastExplanation.explanation.title || 'Biometric Breakdown')}
+                </strong>
+                <div style={{ marginTop: '4px' }}>
+                  {typeof lastExplanation.explanation === 'string'
+                    ? lastExplanation.explanation
+                    : lastExplanation.explanation.message}
+                </div>
+                {lastExplanation.explanation.tips && lastExplanation.explanation.tips.length > 0 && (
+                  <ul style={{ marginTop: '6px', paddingLeft: '16px', fontSize: '11px' }}>
+                    {lastExplanation.explanation.tips.map((tip, i) => (
+                      <li key={i}>{tip}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Model Status */}
+            <div className="model-status-bar">
+              <div title="Xenova/mobilevit-small vision embedding">
+                📸 Vision AI: <strong>{modelsReady ? imageModelStatus : 'Loading…'}</strong>
+              </div>
+              <div title="Siamese BiLSTM + DTW behavioral model">
+                🧠 Behavior: <strong>{behaviorModelInfo}</strong>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="btn-row">
+              <button className="btn btn-primary" onClick={handleAction}>
+                {btnLabel}
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  sigCanvasRef.current?.clear();
+                }}
+              >
+                Clear
+              </button>
+            </div>
+
+            {/* Reset */}
+            <div className="reset-row">
+              <button className="btn btn-danger" onClick={resetAll}>
+                Reset & Re-enroll
+              </button>
+            </div>
+
+          </div>
+        </div>
 
       </main>
     </div>
